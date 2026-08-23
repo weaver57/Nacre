@@ -123,7 +123,9 @@ nacre/
 │   ├── ConfigManager.h/cpp    # C++ backend — file watching, JSON parsing
 │   ├── Config.qml             # QML singleton — single source of truth
 │   └── qmldir
-├── services/                  # System service integrations (audio, network, etc.)
+├── services/                  # System services and external integrations
+│   ├── IpcHandler.qml         # Stub IPC target — ping method, ready for AI CLI
+│   └── qmldir
 ├── utils/                     # Shared utility functions and helpers
 └── assets/                    # Icons, fonts, images, and static resources
 ```
@@ -154,6 +156,9 @@ Nacre follows a layered architecture where each piece has a single responsibilit
 ├──────────────────────────────────────────────────────────┤
 │  BarWrapper → BarContent    (Phase 0: colored rect)      │
 │  Future: LauncherWrapper, NotificationWrapper, …         │
+├──────────────────────────────────────────────────────────┤
+│  IpcHandler (services/)                                  │
+│  Named target → external control door (AI CLI, scripts)  │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -173,7 +178,11 @@ ModuleWrapper {
 
 This is the convention that makes adding new modules mechanical: write the content, write a one-line wrapper, done.
 
-**Key principle:** nothing below a layer ever reaches up. Modules don't parse JSON — they read `Config.*`. ContentWindow doesn't know what a bar is — it just hosts a region. DrawersScope doesn't know what modules exist — it just spawns shells.
+**Key principle:** nothing below a layer ever reaches up. Modules don't parse JSON — they read `Config.*`. ContentWindow doesn't know what a bar is — it just hosts a region. DrawersScope doesn't know what modules exist — it just spawns shells. IpcHandler is the one exception that pokes *outward* — it's the only component that faces external callers.
+
+### External Control (IPC)
+
+The `IpcHandler` registers a well-known target (`org.nacre.shell`) so external processes can talk to the running shell. Right now it only has a `ping` method — the door is open but empty. When the AI CLI integration lands, this is where commands like `reload`, `toggle bar`, or `spawn widget` get routed.
 
 ## Roadmap
 
@@ -183,11 +192,13 @@ This is the convention that makes adding new modules mechanical: write the conte
 - [x] ContentWindow (screen-anchored surface)
 - [x] ModuleWrapper (generic Loader pattern)
 - [x] Bar module (Phase 0 scaffolding)
+- [x] IPC handler (stub with ping)
 - [ ] Bar content: clock, system tray, workspaces
 - [ ] Launcher module
 - [ ] Notifications module
 - [ ] OSD module
-- [ ] Services layer
+- [ ] Real IPC transport (D-Bus / socket)
+- [ ] AI CLI integration
 - [ ] Theming engine
 - [ ] Documentation and guides
 
