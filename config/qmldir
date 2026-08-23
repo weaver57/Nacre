@@ -1,0 +1,6 @@
+module Nacre.Config
+
+singleton Config Config.qml
+
+# ConfigManager is a C++ type registered at startup.
+# Do not read JSON directly — use Config.* properties instead.

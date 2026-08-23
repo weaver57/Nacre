@@ -1,0 +1,4 @@
+module Nacre.Drawers
+
+DrawersScope 1.0 DrawersScope.qml
+ScreenShell 1.0 ScreenShell.qml

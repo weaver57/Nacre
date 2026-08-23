@@ -106,22 +106,14 @@ Thanks to Quickshell, all changes are reflected **instantly** — just save your
 
 ```
 nacre/
-├── shell/              # Main shell entry point and lifecycle
-├── components/
-│   ├── panel/          # Top/bottom panel module
-│   ├── dock/           # Application dock/launcher
-│   ├── widgets/        # Desktop widget system
-│   ├── lockscreen/     # Lock screen module
-│   ├── notifications/  # Notification daemon
-│   └── dashboard/      # Quick settings panel
-├── lib/
-│   ├── theme/          # Theming engine
-│   ├── ipc/            # Inter-process communication
-│   ├── services/       # System service integrations
-│   └── utils/          # Shared utilities
-├── plugins/            # Plugin system and built-in plugins
-├── defaults/           # Default configurations and themes
-└── docs/               # Documentation
+├── modules/
+│   ├── bar/            # Status bar, panels, and top/bottom bars
+│   └── drawers/        # App drawers, popups, and overlay menus
+├── components/         # Shared UI components and widgets
+├── config/             # Default configuration files and templates
+├── services/           # System service integrations (audio, network, etc.)
+├── utils/              # Shared utility functions and helpers
+└── assets/             # Icons, fonts, images, and static resources
 ```
 
 ## Contributing
@@ -132,17 +124,15 @@ Please read our contributing guidelines (coming soon) before submitting a pull r
 
 ## Roadmap
 
+- [x] Project structure locked in
 - [ ] Core shell infrastructure and IPC
-- [ ] Panel module with system tray
-- [ ] Application dock with launcher
+- [ ] Bar module with system tray
+- [ ] Drawers module with app launcher
+- [ ] Component library
+- [ ] Services layer
+- [ ] Configuration system
 - [ ] Theming engine
-- [ ] Lockscreen module
-- [ ] Notification system
-- [ ] Desktop widgets framework
-- [ ] Plugin API and SDK
-- [ ] Default theme collection
 - [ ] Documentation and guides
-- [ ] Package manager integration
 
 ## Acknowledgments
 
