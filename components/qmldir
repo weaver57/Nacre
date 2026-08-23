@@ -1,3 +1,4 @@
 module Nacre.Components
 
 ContentWindow 1.0 ContentWindow.qml
+ModuleWrapper 1.0 ModuleWrapper.qml

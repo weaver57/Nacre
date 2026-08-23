@@ -107,19 +107,25 @@ Thanks to Quickshell, all changes are reflected **instantly** — just save your
 ```
 nacre/
 ├── modules/
-│   ├── bar/            # Status bar, panels, and top/bottom bars
-│   └── drawers/        # Multi-monitor orchestrator
+│   ├── bar/                   # Bar module
+│   │   ├── BarWrapper.qml     # Wrapper — conditionally loads BarContent
+│   │   ├── BarContent.qml     # Phase 0: bare rectangle (scaffolding)
+│   │   └── qmldir
+│   └── drawers/               # Multi-monitor orchestrator
 │       ├── DrawersScope.qml   # Iterates screens, spawns per-display shells
-│       └── ScreenShell.qml    # Per-screen container for modules
-├── components/         # Shared UI primitives
-│   └── ContentWindow.qml      # Screen-anchored surface sized from Config
-├── config/             # Configuration layer
+│       ├── ScreenShell.qml    # Per-screen container for modules
+│       └── qmldir
+├── components/                # Shared UI primitives
+│   ├── ContentWindow.qml      # Screen-anchored surface sized from Config
+│   ├── ModuleWrapper.qml      # Generic Loader pattern (reused by every module)
+│   └── qmldir
+├── config/                    # Configuration layer
 │   ├── ConfigManager.h/cpp    # C++ backend — file watching, JSON parsing
 │   ├── Config.qml             # QML singleton — single source of truth
 │   └── qmldir
-├── services/           # System service integrations (audio, network, etc.)
-├── utils/              # Shared utility functions and helpers
-└── assets/             # Icons, fonts, images, and static resources
+├── services/                  # System service integrations (audio, network, etc.)
+├── utils/                     # Shared utility functions and helpers
+└── assets/                    # Icons, fonts, images, and static resources
 ```
 
 ## Contributing
@@ -133,20 +139,39 @@ Please read our contributing guidelines (coming soon) before submitting a pull r
 Nacre follows a layered architecture where each piece has a single responsibility:
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Config (singleton)                             │
-│  ~/.config/nacre/shell.json → typed properties  │
-├─────────────────────────────────────────────────┤
-│  DrawersScope                                   │
-│  Iterates screens → ScreenShell per monitor     │
-├─────────────────────────────────────────────────┤
-│  ContentWindow                                  │
-│  Screen-anchored surface, sizes from Config     │
-├─────────────────────────────────────────────────┤
-│  Modules (bar, drawers, widgets, …)             │
-│  Drop UI into ContentWindow.content             │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  Config (singleton)                                      │
+│  ~/.config/nacre/shell.json → typed properties           │
+├──────────────────────────────────────────────────────────┤
+│  DrawersScope                                            │
+│  Iterates screens → ScreenShell per monitor              │
+├──────────────────────────────────────────────────────────┤
+│  ContentWindow                                           │
+│  Screen-anchored surface, sizes from Config              │
+├──────────────────────────────────────────────────────────┤
+│  ModuleWrapper              (generic, in components/)    │
+│  Loader reads Config, loads/unloads module content       │
+├──────────────────────────────────────────────────────────┤
+│  BarWrapper → BarContent    (Phase 0: colored rect)      │
+│  Future: LauncherWrapper, NotificationWrapper, …         │
+└──────────────────────────────────────────────────────────┘
 ```
+
+### The Wrapper Pattern
+
+Every module follows the same shape:
+
+```qml
+// modules/<name>/<Name>Wrapper.qml
+ModuleWrapper {
+    moduleName: "<name>"
+    moduleSource: <Name>Content { }
+}
+```
+
+`ModuleWrapper` handles the lifecycle: it reads `modules.<name>.enabled` from Config, and when `false`, the Loader fully destroys the component — no half-states, no hidden rendering. To disable any module, set `"modules": { "<name>": { "enabled": false } }` in `shell.json`.
+
+This is the convention that makes adding new modules mechanical: write the content, write a one-line wrapper, done.
 
 **Key principle:** nothing below a layer ever reaches up. Modules don't parse JSON — they read `Config.*`. ContentWindow doesn't know what a bar is — it just hosts a region. DrawersScope doesn't know what modules exist — it just spawns shells.
 
@@ -156,8 +181,12 @@ Nacre follows a layered architecture where each piece has a single responsibilit
 - [x] Config singleton (JSON → typed properties)
 - [x] DrawersScope (multi-monitor orchestrator)
 - [x] ContentWindow (screen-anchored surface)
-- [ ] Bar module with system tray
-- [ ] Drawer popups and overlays
+- [x] ModuleWrapper (generic Loader pattern)
+- [x] Bar module (Phase 0 scaffolding)
+- [ ] Bar content: clock, system tray, workspaces
+- [ ] Launcher module
+- [ ] Notifications module
+- [ ] OSD module
 - [ ] Services layer
 - [ ] Theming engine
 - [ ] Documentation and guides
