@@ -1,0 +1,3 @@
+module Nacre.Components
+
+ContentWindow 1.0 ContentWindow.qml

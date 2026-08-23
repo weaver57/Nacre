@@ -108,9 +108,15 @@ Thanks to Quickshell, all changes are reflected **instantly** — just save your
 nacre/
 ├── modules/
 │   ├── bar/            # Status bar, panels, and top/bottom bars
-│   └── drawers/        # App drawers, popups, and overlay menus
-├── components/         # Shared UI components and widgets
-├── config/             # Default configuration files and templates
+│   └── drawers/        # Multi-monitor orchestrator
+│       ├── DrawersScope.qml   # Iterates screens, spawns per-display shells
+│       └── ScreenShell.qml    # Per-screen container for modules
+├── components/         # Shared UI primitives
+│   └── ContentWindow.qml      # Screen-anchored surface sized from Config
+├── config/             # Configuration layer
+│   ├── ConfigManager.h/cpp    # C++ backend — file watching, JSON parsing
+│   ├── Config.qml             # QML singleton — single source of truth
+│   └── qmldir
 ├── services/           # System service integrations (audio, network, etc.)
 ├── utils/              # Shared utility functions and helpers
 └── assets/             # Icons, fonts, images, and static resources
@@ -122,15 +128,37 @@ Nacre welcomes contributions! Whether it's bug reports, feature requests, docume
 
 Please read our contributing guidelines (coming soon) before submitting a pull request.
 
+## Architecture
+
+Nacre follows a layered architecture where each piece has a single responsibility:
+
+```
+┌─────────────────────────────────────────────────┐
+│  Config (singleton)                             │
+│  ~/.config/nacre/shell.json → typed properties  │
+├─────────────────────────────────────────────────┤
+│  DrawersScope                                   │
+│  Iterates screens → ScreenShell per monitor     │
+├─────────────────────────────────────────────────┤
+│  ContentWindow                                  │
+│  Screen-anchored surface, sizes from Config     │
+├─────────────────────────────────────────────────┤
+│  Modules (bar, drawers, widgets, …)             │
+│  Drop UI into ContentWindow.content             │
+└─────────────────────────────────────────────────┘
+```
+
+**Key principle:** nothing below a layer ever reaches up. Modules don't parse JSON — they read `Config.*`. ContentWindow doesn't know what a bar is — it just hosts a region. DrawersScope doesn't know what modules exist — it just spawns shells.
+
 ## Roadmap
 
 - [x] Project structure locked in
-- [ ] Core shell infrastructure and IPC
+- [x] Config singleton (JSON → typed properties)
+- [x] DrawersScope (multi-monitor orchestrator)
+- [x] ContentWindow (screen-anchored surface)
 - [ ] Bar module with system tray
-- [ ] Drawers module with app launcher
-- [ ] Component library
+- [ ] Drawer popups and overlays
 - [ ] Services layer
-- [ ] Configuration system
 - [ ] Theming engine
 - [ ] Documentation and guides
 
