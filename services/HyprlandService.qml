@@ -39,12 +39,16 @@ QtObject {
     //
     // Use HyprlandService.workspaces in a Repeater. Each item is a
     // HyprlandWorkspace with reactive properties.
-    property alias workspaces: Hyprland.workspaces
+    //
+    // NOTE: Can't use property alias here — Hyprland is an imported
+    // singleton, not a local id. Direct binding achieves the same
+    // reactivity: Hyprland's properties change → this property updates.
+    property var workspaces: Hyprland.workspaces
 
     // ── Focused workspace ─────────────────────────────────────────
     // The workspace that has keyboard focus RIGHT NOW.
     // May be null — consumers MUST null-check before accessing .id, .name.
-    property alias focusedWorkspace: Hyprland.focusedWorkspace
+    property var focusedWorkspace: Hyprland.focusedWorkspace
 
     // ── Monitors ──────────────────────────────────────────────────
     // All connected monitors. Each has:
@@ -52,22 +56,22 @@ QtObject {
     //
     // Per-monitor widgets bind to their monitor's activeWorkspace
     // to show the correct workspace indicator per display.
-    property alias monitors: Hyprland.monitors
+    property var monitors: Hyprland.monitors
 
     // ── Focused monitor ───────────────────────────────────────────
     // The monitor that currently has keyboard focus.
     // May be null.
-    property alias focusedMonitor: Hyprland.focusedMonitor
+    property var focusedMonitor: Hyprland.focusedMonitor
 
     // ── Active toplevel ───────────────────────────────────────────
     // The window (toplevel) that currently has focus.
     // May be null. Useful for future window-title or app-indicator widgets.
-    property alias activeToplevel: Hyprland.activeToplevel
+    property var activeToplevel: Hyprland.activeToplevel
 
     // ── All toplevels ─────────────────────────────────────────────
     // Every window open across all workspaces.
     // ObjectModel<Toplevel> — useful for future taskbar/dock work.
-    property alias toplevels: Hyprland.toplevels
+    property var toplevels: Hyprland.toplevels
 
     // ── Actions ───────────────────────────────────────────────────
     // Compositor dispatchers routed through the service.
