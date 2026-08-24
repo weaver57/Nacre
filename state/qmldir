@@ -1,0 +1,4 @@
+module Nacre.State
+
+singleton GlobalStates GlobalStates.qml
+singleton Persistent Persistent.qml

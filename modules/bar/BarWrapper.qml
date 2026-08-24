@@ -1,23 +1,26 @@
 import QtQuick
-import Nacre.Components
 
 /**
  * BarWrapper — the bar module's entry point.
  *
- * Uses ModuleWrapper to conditionally load BarContent based on
- * `modules.bar.enabled` in Config. This is the reference
- * implementation of the Wrapper pattern — every future module
- * (launcher, notifications, OSD, …) follows this same shape:
- *
- *   ModuleWrapper {
- *       moduleName: "<module>"
- *       moduleSource: <ModuleContent> { }
- *   }
- *
- * To disable the bar, set `"modules": { "bar": { "enabled": false } }`
- * in shell.json. No code changes needed.
+ * Phase 0: plain bar content. ContentWindow handles visibility
+ * based on Config, so no Loader needed here yet.
  */
-ModuleWrapper {
-    moduleName: "bar"
-    moduleSource: BarContent { }
+Item {
+    id: wrapper
+
+    anchors.fill: parent
+
+    Rectangle {
+        anchors.fill: parent
+        color: "#2d2d44"
+
+        Text {
+            anchors.centerIn: parent
+            text: "bar (Phase 0)"
+            color: "#ffffff"
+            font.family: "monospace"
+            font.pixelSize: 14
+        }
+    }
 }

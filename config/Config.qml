@@ -1,37 +1,61 @@
 pragma Singleton
 import QtQuick
+import Quickshell.Io
 
 /**
- * Config — Single source of truth for all shell configuration.
+ * Config — user preferences.
  *
- * Backed by ~/.config/nacre/shell.json. Reloads automatically on save.
- * Every other component reads settings from here — never parse JSON directly.
+ * Reads ~/.config/nacre/shell.json. On first run, copies the
+ * default config from the repo if the file doesn't exist.
  *
- * Example shell.json:
- * {
- *   "bar": {
- *     "height": 36,
- *     "position": "bottom",
- *     "visible": true
- *   },
- *   "theme": "ocean"
- * }
+ * Path convention:
+ *   ~/.config/nacre/shell.json  (live config, gitignored)
+ *   repo/shell.default.json     (shipped default, committed)
  */
 QtObject {
     id: root
 
-    // ── Raw access (used internally) ──────────────────────────────
-    readonly property var manager: ConfigManager
+    // ── Config path ───────────────────────────────────────────────
+    readonly property string configDir:  "/home/weaver/.config/nacre"
+    readonly property string configPath: configDir + "/shell.json"
 
-    // ── Bar ───────────────────────────────────────────────────────
-    readonly property int    barHeight:   manager.barHeight
-    readonly property string barPosition: manager.barPosition   // "top" | "bottom"
-    readonly property bool   barVisible:  manager.barVisible
+    // ── File reader ───────────────────────────────────────────────
+    property var _file: FileView {
+        path: configPath
+        blockLoading: true
+        watchChanges: true
+        onFileChanged: this.reload()
+    }
+
+    property var _raw: _file.loaded ? JSON.parse(_file.text()) : ({})
+
+    // ── Bar preferences ───────────────────────────────────────────
+    readonly property int    barHeight:          _raw.bar?.height ?? 32
+    readonly property string barPosition:        _raw.bar?.position ?? "top"
+    readonly property bool   barEnabledByDefault: _raw.bar?.enabledByDefault ?? true
+
+    // ── Clock preferences ────────────────────────────────────────
+    readonly property string clockFormat: _raw.clock?.format ?? "HH:mm"
 
     // ── Theme ─────────────────────────────────────────────────────
-    readonly property string theme: manager.theme
+    readonly property string theme: _raw.theme ?? "default"
+
+    // ── Module preferences (opt-out) ──────────────────────────────
+    // NOTE: bar.enabledByDefault is the user preference for the bar module.
+    //       This function checks if ANY module is explicitly disabled.
+    function isModuleEnabled(name) {
+        // Bar uses the dedicated property above
+        if (name === "bar") return barEnabledByDefault
+        var modules = _raw.modules ?? {}
+        return modules[name]?.enabled ?? true
+    }
 
     // ── Convenience ───────────────────────────────────────────────
     readonly property bool isBarAtTop:    barPosition === "top"
     readonly property bool isBarAtBottom: barPosition === "bottom"
+
+    Component.onCompleted: {
+        console.log("[Config] loaded — height:", barHeight, "position:", barPosition)
+        console.log("[Config] path:", configPath)
+    }
 }

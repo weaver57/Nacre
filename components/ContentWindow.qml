@@ -1,56 +1,52 @@
 import QtQuick
 import Quickshell
-import Nacre.Config
+import "../config" as Config
+import "../state" as State
 
 /**
  * ContentWindow — the actual on-screen surface, one per monitor.
  *
- * Anchors itself to a screen edge and sizes itself from Config.
- * Hosts whatever module content gets placed inside it via the
- * `content` property. Knows nothing about bars, drawers, or
- * what it's actually displaying — it's just a region of screen space.
+ * Visibility logic (two-layer check):
+ *   1. Config.isModuleEnabled("bar") — user preference (persisted in shell.json)
+ *   2. State.GlobalStates.barOpen — runtime toggle (ephemeral, resets on restart)
  *
- * Modules drop their UI into `content`; ContentWindow handles
- * positioning, sizing, and screen binding.
+ * Both must be true for the window to show. Config controls whether
+ * the module is installed/enabled; GlobalStates controls whether it's
+ * open right now this session.
+ *
+ * When hidden, the PanelWindow is fully invisible and the compositor
+ * reclaims the exclusion zone — other windows fill the space.
  */
 PanelWindow {
     id: root
 
-    // ── Screen assignment ─────────────────────────────────────────
-    // Set by ScreenShell — determines which physical display this
-    // surface renders on.
     required property var screen
 
     screen: root.screen
 
-    // ── Geometry from Config ──────────────────────────────────────
-    // Height/width adapts to bar.position. The window always spans
-    // the full width (or height) of the assigned screen.
-    implicitHeight: Config.barPosition === "top" || Config.barPosition === "bottom"
-                    ? Config.barHeight
-                    : screen.height
+    // ── Visibility ────────────────────────────────────────────────
+    // Preference (persisted) AND runtime toggle (ephemeral) must both be true
+    visible: Config.Config.isModuleEnabled("bar") && State.GlobalStates.barOpen
 
-    implicitWidth: Config.barPosition === "left" || Config.barPosition === "right"
-                   ? Config.barHeight
-                   : screen.width
+    // ── Height from Config ────────────────────────────────────────
+    implicitHeight: Config.Config.barHeight ?? 32
 
-    // ── Edge anchoring ────────────────────────────────────────────
-    // Panels live at the very edge of the screen. The exclusion zone
-    // tells the compositor to reserve space so maximized windows
-    // don't overlap this surface.
+    // ── Anchor to top edge ────────────────────────────────────────
+    // Phase 0: hardcoded to top. Phase 2+ will read from Config.barPosition
+    // once the multi-position layout system is built.
     anchors {
-        top:    Config.isBarAtTop    ? true : undefined
-        bottom: Config.isBarAtBottom ? true : undefined
-        left:   Config.barPosition === "left"  ? true : undefined
-        right:  Config.barPosition === "right" ? true : undefined
+        top: true
+        left: true
+        right: true
     }
 
-    // ── Appearance ────────────────────────────────────────────────
-    color: "transparent"
+    // ── Background ────────────────────────────────────────────────
+    // Visible so the bar has a surface. Theme colors come in Phase 4.
+    color: "#1a1a2e"
 
     // ── Content slot ──────────────────────────────────────────────
-    // Modules place their UI here. ContentWindow only cares that
-    // something fills this space — it never inspects the children.
+    // Modules drop their content here. ContentWindow knows nothing
+    // about what a "bar" is — it just hosts a region of content.
     default property alias content: container.data
 
     Item {

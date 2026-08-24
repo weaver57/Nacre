@@ -1,5 +1,5 @@
 import QtQuick
-import Nacre.Config
+import "../../config"
 
 /**
  * BarContent — Phase 0 bar implementation.
