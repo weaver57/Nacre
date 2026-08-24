@@ -96,9 +96,40 @@ if [[ -f "services/HyprlandService.qml" ]]; then
     check "Has switchWorkspace function"  "grep -q 'function switchWorkspace' services/HyprlandService.qml"
     check "No visual elements"           "! grep -E 'Rectangle|Text|Item \{' services/HyprlandService.qml | grep -v '^[[:space:]]*\*' | grep -v '^[[:space:]]*//' | grep -q ."
     check "No UI module imports"         "! grep -E 'import.*modules|import.*components' services/HyprlandService.qml | grep -v '^[[:space:]]*\*' | grep -v '^[[:space:]]*//' | grep -q ."
+    check "No property alias to singleton" "! grep -qE 'property alias.*: Hyprland\.' services/HyprlandService.qml"
+    check "No visual children in QtObject"  "! grep -qE 'Connections \{|Timer \{' services/HyprlandService.qml"
 else
     info "HyprlandService.qml not found — skipping service checks"
 fi
+
+# ══════════════════════════════════════════════════════════════════
+# 2d. QML SINGLETON RULES (learned the hard way)
+# ══════════════════════════════════════════════════════════════════
+header "2d. QML Singleton Rules"
+
+# Rule 1: Every qmldir singleton must have pragma Singleton in source
+for qmldir_file in config/qmldir state/qmldir services/qmldir; do
+    if [[ -f "$qmldir_file" ]]; then
+        dir=$(dirname "$qmldir_file")
+        while IFS= read -r line; do
+            # Extract type name from "singleton TypeName file.qml" lines
+            type_name=$(echo "$line" | awk '/^singleton/ { print $2 }')
+            type_file=$(echo "$line" | awk '/^singleton/ { print $3 }')
+            if [[ -n "$type_name" && -n "$type_file" ]]; then
+                filepath="$dir/$type_file"
+                if [[ -f "$filepath" ]]; then
+                    check "$type_name has pragma Singleton" "grep -q 'pragma Singleton' $filepath"
+                fi
+            fi
+        done < "$qmldir_file"
+    fi
+done
+
+# Rule 2: shell.qml must not instantiate singletons with {}
+check "No singleton instantiation in shell.qml" "! grep -qE '(IpcHandler|HyprlandService|Config|GlobalStates|Persistent)\s*\{' shell.qml"
+
+# Rule 3: No property alias to imported singletons anywhere
+check "No alias to imported singletons" "! grep -rE 'property alias.*: (Hyprland|Config|GlobalStates|Persistent)\.' --include='*.qml' . 2>/dev/null | grep -v '^[[:space:]]*\*' | grep -v '^[[:space:]]*//' | grep -q ."
 
 # ══════════════════════════════════════════════════════════════════
 # 2c. WORKSPACES WIDGET — service → widget binding
