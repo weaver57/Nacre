@@ -2,6 +2,8 @@
 
 The rules that keep a shell "modular" instead of "five modules built five different ways."
 
+Every convention here was learned the hard way. Follow them.
+
 ---
 
 ## State Architecture
@@ -29,6 +31,79 @@ Every property in Nacre belongs to exactly one of three tiers. The distinguishin
 import "../config" as Config    // Config singleton
 import "../state" as State      // GlobalStates, Persistent
 import "../services" as Services // HyprlandService, etc.
+```
+
+---
+
+## QML Singleton Rules
+
+These are non-negotiable. Every one was a runtime crash before we learned it.
+
+### Rule 1: `pragma Singleton` in every singleton file
+
+Every file registered as `singleton` in a `qmldir` must declare `pragma Singleton` at the top. Quickshell rejects the shell if it's missing.
+
+```qml
+// ✅ Correct
+pragma Singleton
+import QtQuick
+QtObject { ... }
+
+// ❌ Wrong — missing pragma
+import QtQuick
+QtObject { ... }
+```
+
+### Rule 2: No `property alias` to imported singletons
+
+`property alias` requires a local `id`. Imported singletons (`Hyprland`, `Config`, etc.) are not local ids. Use `property var` with a direct binding instead.
+
+```qml
+// ✅ Correct — direct binding
+property var workspaces: Hyprland.workspaces
+
+// ❌ Wrong — alias to imported singleton
+property alias workspaces: Hyprland.workspaces
+```
+
+### Rule 3: No visual children inside `QtObject`
+
+`QtObject` has no default property for children. Visual types (`Connections`, `Timer`, `Rectangle`, `Item`) cannot be nested inside it. Use `Component.onCompleted` for startup logic.
+
+```qml
+// ✅ Correct
+QtObject {
+    Component.onCompleted: { /* ... */ }
+}
+
+// ❌ Wrong — Connections is a visual Item
+QtObject {
+    Connections { target: Hyprland; ... }
+}
+```
+
+### Rule 4: Never instantiate singletons with `{}`
+
+Singletons are auto-created by QML on first access. You cannot create them with `MySingleton {}`.
+
+```qml
+// ✅ Correct — reference the singleton
+Component.onCompleted: console.log(Services.IpcHandler.targetName)
+
+// ❌ Wrong — trying to instantiate
+Services.IpcHandler { id: ipc }
+```
+
+### Rule 5: No `property alias` to Config properties
+
+Same as Rule 2 — Config is an imported singleton. Use `property var` or read directly.
+
+```qml
+// ✅ Correct
+property var barHeight: Config.Config.barHeight
+
+// ❌ Wrong
+property alias barHeight: Config.Config.barHeight
 ```
 
 ---
@@ -68,7 +143,7 @@ services/
 ### Lifecycle rules
 
 1. **No reverse imports.** Services must never import UI modules. Direction is strictly: `services → modules`, never the reverse.
-2. **Availability flag.** Every service exposes `property bool available: false`, flipped true once the data source responds. Consumers check this before reading data.
+2. **Availability flag.** Every service exposes `property bool available`. Set it unconditionally in `Component.onCompleted` if the import succeeded.
 3. **No cross-service imports** if avoidable. If a dependency is unavoidable, document it at the top of the file.
 4. **One file per service.** No "god service" that owns multiple unrelated data sources.
 
@@ -82,34 +157,47 @@ Service → wraps external source (Hyprland, D-Bus, etc.)
 
 **Never:** `Widget → imports Quickshell.Hyprland directly`
 
-This keeps compositor-specific code in ONE file. Swapping compositors means rewriting only the service, not every widget.
-
 ### HyprlandService (worked example)
 
 ```qml
 // services/HyprlandService.qml
+pragma Singleton
 import QtQuick
 import Quickshell.Hyprland
 
 QtObject {
+    id: root
     property bool available: false
-    property alias workspaces: Hyprland.workspaces
-    property alias focusedWorkspace: Hyprland.focusedWorkspace
-    property alias monitors: Hyprland.monitors
+
+    // Direct bindings — NOT aliases (Rule 2)
+    property var workspaces: Hyprland.workspaces
+    property var focusedWorkspace: Hyprland.focusedWorkspace
+    property var monitors: Hyprland.monitors
 
     function switchWorkspace(id) {
+        if (!available) return
         Hyprland.dispatch("workspace " + id)
+    }
+
+    Component.onCompleted: {
+        available = true
+        console.log("[HyprlandService] available —", Hyprland.workspaces.count, "workspaces")
     }
 }
 ```
 
-Widgets consume it:
+### SystemClock (no custom service needed)
+
+Quickshell's built-in `SystemClock` already behaves like a service (reactive property, owns its data source). Use it directly — no wrapper needed.
 
 ```qml
-// modules/bar/Workspaces.qml
-Repeater {
-    model: Services.HyprlandService.workspaces
-    // ...
+// modules/bar/Clock.qml
+SystemClock {
+    id: clock
+    precision: SystemClock.Minutes
+}
+Text {
+    text: Qt.formatDateTime(clock.date, Config.Config.clockFormat)
 }
 ```
 
@@ -134,44 +222,93 @@ Every UI module follows this exact three-layer shape. No exceptions.
 
 ### Layer 1: Wrapper
 
-The outer container. Owns module-scoped properties, handles initialization, and binds to IPC.
+The outer container. Owns module-scoped properties, handles initialization, and loads the content.
 
 ```qml
 // modules/<name>/<Name>Wrapper.qml
+import QtQuick
+
 Item {
     id: wrapper
-
     anchors.fill: parent
 
-    // Module-scoped properties (if any)
-    // ...
-
-    // IPC binding (see Control Mechanisms below)
-    // ...
-
-    Loader {
-        id: loader
+    // Load the real content
+    <Name>Content {
         anchors.fill: parent
-        active: State.GlobalStates.<name>Open
-        sourceComponent: Component { /* Layer 3 */ }
     }
 }
 ```
 
-### Layer 2: Loader
+### Layer 2: Loader (when needed)
 
-Reads `GlobalStates.<name>Open` to decide whether to instantiate the content. When `false`, the component is fully destroyed — no half-states, no hidden rendering.
+For modules with runtime visibility toggles, the Wrapper uses a Loader bound to `GlobalStates.<name>Open`. When `false`, the component is fully destroyed — no half-states, no hidden rendering.
+
+ContentWindow already gates visibility via `GlobalStates.barOpen`, so the bar's Wrapper doesn't need a Loader — it just loads BarContent directly.
 
 ### Layer 3: Content
 
-Pure rendering. Knows nothing about visibility, IPC, or state management. Just draws what it's told to draw.
+Pure rendering. Knows nothing about visibility, IPC, or state management. Just draws what it's told to draw. Reads from services and Config — never from raw JSON.
 
 ```qml
-// modules/<name>/<Name>Content.qml
+// modules/bar/BarContent.qml
 Rectangle {
-    // Visual content only
+    Workspaces { anchors.left: parent.left; ... }   // compositor-driven
+    Clock { anchors.right: parent.right; ... }       // time-driven
 }
 ```
+
+### Widget rules
+
+- **No availability guards on widgets.** Don't wrap widgets in `visible: service.available`. Let the Repeater handle empty models — it renders nothing when the model is empty, which is correct.
+- **No local state.** Widgets are pure reflections of their data source. If a widget needs to remember something, it goes in GlobalStates or Persistent.
+- **No raw JSON access.** All data flows through Config, GlobalStates, Persistent, or services.
+
+---
+
+## Bar Layout
+
+The bar is the first real module. Its layout conventions become the template for other modules.
+
+### Current layout
+
+```
+[workspace pills] .......................... [clock]
+  left-aligned                              right-aligned
+  reads HyprlandService                     reads SystemClock + Config
+```
+
+### Positioning
+
+Widgets anchor to the bar edges:
+
+```qml
+// Left-aligned widget
+Workspaces {
+    anchors.left: parent.left
+    anchors.leftMargin: 8
+    anchors.verticalCenter: parent.verticalCenter
+}
+
+// Right-aligned widget
+Clock {
+    anchors.right: parent.right
+    anchors.rightMargin: 8
+    anchors.verticalCenter: parent.verticalCenter
+}
+
+// Center widget (future: system tray, notifications)
+SomeWidget {
+    anchors.centerIn: parent
+}
+```
+
+### Adding a new bar widget
+
+1. Create `modules/bar/<Widget>.qml`
+2. Import the service it needs (`import "../../services" as Services`)
+3. Bind to the service property reactively
+4. Add to BarContent.qml with appropriate anchoring
+5. Register in `modules/bar/qmldir`
 
 ---
 
@@ -195,12 +332,10 @@ function toggle<Name>() {
 For Hyprland keybinds. Calls the same IPC method — never reaches into Hyprland directly.
 
 ```qml
-// In the module's Wrapper or a dedicated Shortcuts.qml
 GlobalShortcut {
     name: "<module>.toggle"
     description: "Toggle <module>"
     onPressed: {
-        // Same path as IPC — through GlobalStates
         State.GlobalStates.<name>Open = !State.GlobalStates.<name>Open
     }
 }
@@ -216,7 +351,28 @@ Keybind → GlobalShortcut → GlobalStates → Module visibility
 
 **Never:** `Keybind → Hyprland dispatcher → module reacts`
 
-This ensures every toggle is observable, testable, and consistent regardless of how it was triggered.
+---
+
+## Relative Imports
+
+During development, all QML files use relative paths. Module imports (`import Nacre.Config`) only work after installation.
+
+```qml
+// In modules/bar/BarContent.qml:
+import "../../config" as Config      // → config/Config.qml
+import "../../services" as Services  // → services/HyprlandService.qml
+
+// In components/ContentWindow.qml:
+import "../config" as Config         // → config/Config.qml
+import "../state" as State           // → state/GlobalStates.qml
+
+// In shell.qml:
+import "./config" as Config          // → config/
+import "./state" as State            // → state/
+import "./services" as Services      // → services/
+```
+
+The `qmldir` files still exist for future installation, but for development, relative imports just work.
 
 ---
 
@@ -227,10 +383,12 @@ This ensures every toggle is observable, testable, and consistent regardless of 
 | Module directory | `modules/bar/`, `modules/launcher/` |
 | Wrapper | `BarWrapper.qml`, `LauncherWrapper.qml` |
 | Content | `BarContent.qml`, `LauncherContent.qml` |
+| Widget (bar) | `Workspaces.qml`, `Clock.qml` |
 | GlobalStates property | `barOpen`, `launcherOpen` |
 | IPC method | `toggleBar()`, `toggleLauncher()` |
 | Config preference | `bar.enabledByDefault`, `bar.height` |
 | Shortcut name | `bar.toggle`, `launcher.toggle` |
+| Service file | `HyprlandService.qml`, `AudioService.qml` |
 
 ---
 
@@ -252,8 +410,14 @@ services/
 └── qmldir
 
 modules/<name>/
-├── <Name>Wrapper.qml       # Layer 1: container + IPC + Loader
-├── <Name>Content.qml       # Layer 3: pure UI
+├── <Name>Wrapper.qml       # Layer 1: container + content loader
+├── <Name>Content.qml       # Layer 3: pure UI layout
+├── <Widget>.qml            # Individual widgets (Workspaces, Clock, etc.)
+└── qmldir
+
+components/
+├── ContentWindow.qml       # Screen-anchored surface (one per monitor)
+├── ModuleWrapper.qml       # Generic Loader pattern
 └── qmldir
 ```
 
@@ -261,7 +425,7 @@ modules/<name>/
 
 ## Checklist
 
-When adding a new module, verify:
+### Adding a new module
 
 - [ ] Three-layer structure (Wrapper → Loader → Content)
 - [ ] `GlobalStates.<name>Open` controls the Loader
@@ -271,10 +435,22 @@ When adding a new module, verify:
 - [ ] Content has no visibility/state logic
 - [ ] Naming follows convention table above
 
-When adding a new service, verify:
+### Adding a new service
 
 - [ ] Pure QtObject — zero visual elements
+- [ ] `pragma Singleton` declared
 - [ ] Owns exactly one data source
-- [ ] `available` flag exposed and checked by consumers
+- [ ] `property var` for reactive properties (not `property alias`)
+- [ ] No visual children (Connections, Timer, etc.) inside QtObject
+- [ ] `available` flag set in Component.onCompleted
 - [ ] No UI module imports
 - [ ] All compositor actions go through named functions, not raw `dispatch()`
+
+### Adding a new bar widget
+
+- [ ] File in `modules/bar/<Widget>.qml`
+- [ ] Imports service it needs (`import "../../services" as Services`)
+- [ ] Binds to service property reactively (no local state)
+- [ ] No `visible: service.available` guard — let Repeater handle empty models
+- [ ] Registered in `modules/bar/qmldir`
+- [ ] Added to BarContent.qml with correct anchoring

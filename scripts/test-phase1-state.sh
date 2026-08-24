@@ -86,7 +86,7 @@ check "services/HyprlandService.qml"    "test -f services/HyprlandService.qml"
 header "2b. Service Layer (HyprlandService)"
 
 if [[ -f "services/HyprlandService.qml" ]]; then
-    check "IpcHandler has pragma Singleton" "grep -q 'pragma Singleton' services/IpcHandler.qml"
+    check "IpcHandler is a type (not singleton)" "grep -q '^IpcHandler' services/qmldir"
     check "HyprlandService has pragma Singleton" "grep -q 'pragma Singleton' services/HyprlandService.qml"
     check "Imports Quickshell.Hyprland"  "grep -q 'import Quickshell.Hyprland' services/HyprlandService.qml"
     check "Has available flag"           "grep -q 'property bool available' services/HyprlandService.qml"
@@ -100,6 +100,28 @@ if [[ -f "services/HyprlandService.qml" ]]; then
     check "No visual children in QtObject"  "! grep -qE 'Connections \{|Timer \{' services/HyprlandService.qml"
 else
     info "HyprlandService.qml not found — skipping service checks"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 2f. IPC HANDLER — typed methods via Quickshell.Io.IpcHandler
+# ══════════════════════════════════════════════════════════════════
+header "2f. IPC Handler"
+
+if [[ -f "services/IpcHandler.qml" ]]; then
+    check "Imports Quickshell.Io"        "grep -q 'import Quickshell.Io' services/IpcHandler.qml"
+    check "Extends IpcHandler type"      "grep -q 'IpcHandler {' services/IpcHandler.qml"
+    check "Has target property"          "grep -q 'target:' services/IpcHandler.qml"
+    check "Instantiated in shell.qml"    "grep -q 'Services.IpcHandler' shell.qml"
+    check "Has ping function"            "grep -q 'function ping' services/IpcHandler.qml"
+    check "Has barToggle function"       "grep -q 'function barToggle' services/IpcHandler.qml"
+    check "Has barShow function"         "grep -q 'function barShow' services/IpcHandler.qml"
+    check "Has barHide function"         "grep -q 'function barHide' services/IpcHandler.qml"
+    check "Has workspaceSwitch function"  "grep -q 'function workspaceSwitch' services/IpcHandler.qml"
+    check "Has shellStatus function"     "grep -q 'function shellStatus' services/IpcHandler.qml"
+    check "Functions have return types"  "grep -q '): string' services/IpcHandler.qml"
+    check "No targetName (uses target)"  "! grep -v '^[[:space:]]*\*' services/IpcHandler.qml | grep -v '^[[:space:]]*//' | grep -q 'targetName'"
+else
+    info "IpcHandler.qml not found — skipping IPC checks"
 fi
 
 # ══════════════════════════════════════════════════════════════════
@@ -125,8 +147,7 @@ for qmldir_file in config/qmldir state/qmldir services/qmldir; do
     fi
 done
 
-# Rule 2: shell.qml must not instantiate singletons with {}
-check "No singleton instantiation in shell.qml" "! grep -qE '(IpcHandler|HyprlandService|Config|GlobalStates|Persistent)\s*\{' shell.qml"
+# Rule 2: shell.qml must not instantiate singletons with {}    check "No singleton instantiation in shell.qml" "! grep -qE '(HyprlandService|Config|GlobalStates|Persistent)\s*\{' shell.qml"
 
 # Rule 3: No property alias to imported singletons anywhere
 check "No alias to imported singletons" "! grep -rE 'property alias.*: (Hyprland|Config|GlobalStates|Persistent)\.' --include='*.qml' . 2>/dev/null | grep -v '^[[:space:]]*\*' | grep -v '^[[:space:]]*//' | grep -q ."
@@ -348,6 +369,7 @@ if [[ $FAIL -eq 0 ]]; then
     echo "  • HyprlandService: singleton, available flag, reactive properties, no UI"
     echo "  • Workspaces widget: Repeater, service binding, switchWorkspace, click-to-switch"
     echo "  • Clock widget: SystemClock, Config format, Qt.formatDateTime"
+    echo "  • IPC handler: typed methods (ping, barToggle, workspaceSwitch, shellStatus)"
     echo "  • Config: valid JSON, enabledByDefault (not visible), clock.format"
     echo "  • State: valid JSON, lastWorkspace round-trips"
     echo "  • No stale imports from old config/GlobalStates, config/Persistent"

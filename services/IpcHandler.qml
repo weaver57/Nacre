@@ -1,50 +1,72 @@
-pragma Singleton
 import QtQuick
+import Quickshell.Io
+import "../state" as State
+import "../services" as Services
 
 /**
  * IpcHandler — the external-control door.
  *
- * Registers a named IPC target on the shell root so external processes
- * (CLI tools, AI agents, scripts) can talk to the running shell.
+ * Instantiated directly in shell.qml as a child of Scope.
+ * NOT a singleton — Quickshell.Io.IpcHandler must be a child element
+ * to register with the IPC system.
  *
- * Phase 0: just a stub with a ping method. The real IPC transport
- * (D-Bus, socket, or Quickshell's own mechanism) gets wired in later.
- * Right now this only proves the interface exists and is callable.
+ * Accessible from terminal via:
+ *   qs ipc --id <instance> call nacre <method> [args]
  *
- * The `targetName` is the well-known name other processes use to
- * address this shell instance. Change it if you want multiple shells
- * on the same machine.
+ * Methods:
+ *   ping              → health check
+ *   barToggle         → toggle bar visibility
+ *   barShow / barHide → explicit bar control
+ *   workspaceSwitch N → switch to workspace N
+ *   shellStatus       → JSON with shell state
+ *
+ * All argument and return types must be explicitly typed.
  */
-QtObject {
+IpcHandler {
     id: root
 
     // ── Identity ──────────────────────────────────────────────────
-    // Well-known name for this IPC target. External processes use
-    // this to find and address the shell.
-    readonly property string targetName: "org.nacre.shell"
+    target: "nacre"
 
-    // ── Methods ───────────────────────────────────────────────────
-    // These are the "API" that external callers hit. For now there's
-    // only one. New methods get added here as the AI CLI integration
-    // and other external tools need them.
-
-    /**
-     * Ping — trivial health-check.
-     * Returns a fixed string so callers can confirm the shell is alive.
-     *
-     * Future: this is where the AI CLI sends commands like
-     * "toggle bar", "reload config", "spawn widget", etc.
-     */
-    function ping() {
-        console.log("[IPC] ping received from", Qt.target ?? "unknown")
-        return "pong from " + targetName
+    // ── Health check ─────────────────────────────────────────────
+    function ping(): string {
+        console.log("[IPC] ping")
+        return "pong from " + target
     }
 
-    // ── Future hooks ──────────────────────────────────────────────
-    // When real IPC lands, the transport layer calls into these:
-    //
-    //   function handleCommand(command, args) { ... }
-    //   function broadcast(event, payload) { ... }
-    //
-    // For now, ping is the only door open.
+    // ── Bar control ──────────────────────────────────────────────
+    function barToggle(): void {
+        console.log("[IPC] bar.toggle —", !State.GlobalStates.barOpen ? "showing" : "hiding")
+        State.GlobalStates.barOpen = !State.GlobalStates.barOpen
+    }
+
+    function barShow(): void {
+        console.log("[IPC] bar.show")
+        State.GlobalStates.barOpen = true
+    }
+
+    function barHide(): void {
+        console.log("[IPC] bar.hide")
+        State.GlobalStates.barOpen = false
+    }
+
+    // ── Workspace control ────────────────────────────────────────
+    function workspaceSwitch(id: int): void {
+        console.log("[IPC] workspace.switch —", id)
+        Services.HyprlandService.switchWorkspace(id)
+    }
+
+    // ── Shell status ─────────────────────────────────────────────
+    function shellStatus(): string {
+        var status = {
+            target: target,
+            barOpen: State.GlobalStates.barOpen,
+            hyprlandAvailable: Services.HyprlandService.available,
+            workspaceCount: Services.HyprlandService.workspaces
+                ? Services.HyprlandService.workspaces.count : 0,
+            focusedWorkspace: Services.HyprlandService.focusedWorkspace
+                ? Services.HyprlandService.focusedWorkspace.id : -1
+        }
+        return JSON.stringify(status)
+    }
 }
