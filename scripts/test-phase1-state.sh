@@ -86,7 +86,8 @@ check "services/HyprlandService.qml"    "test -f services/HyprlandService.qml"
 header "2b. Service Layer (HyprlandService)"
 
 if [[ -f "services/HyprlandService.qml" ]]; then
-    check "Has pragma Singleton"         "grep -q 'pragma Singleton' services/HyprlandService.qml"
+    check "IpcHandler has pragma Singleton" "grep -q 'pragma Singleton' services/IpcHandler.qml"
+    check "HyprlandService has pragma Singleton" "grep -q 'pragma Singleton' services/HyprlandService.qml"
     check "Imports Quickshell.Hyprland"  "grep -q 'import Quickshell.Hyprland' services/HyprlandService.qml"
     check "Has available flag"           "grep -q 'property bool available' services/HyprlandService.qml"
     check "Has workspaces property"      "grep -q 'workspaces' services/HyprlandService.qml"
