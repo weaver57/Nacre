@@ -3,3 +3,4 @@ module Nacre.Bar
 BarWrapper 1.0 BarWrapper.qml
 BarContent 1.0 BarContent.qml
 Workspaces 1.0 Workspaces.qml
+Clock 1.0 Clock.qml

@@ -5,15 +5,15 @@ import "../../services" as Services
 /**
  * BarContent — the actual bar layout.
  *
- * Phase 0 was a placeholder rectangle. This is the first real content:
- * workspaces on the left, clock will go on the right (Phase 1 step 1.6).
+ * Real bar layout with two consumer widgets:
+ *   - Workspaces (left): compositor-driven, reads HyprlandService
+ *   - Clock (right): time-driven, reads SystemClock + Config
  *
  * Layout:
  *   [workspaces] ........................ [clock]
  *
- * The bar's height and background color come from Config.
- * The workspaces widget reads from HyprlandService — proving
- * the service → widget binding works end-to-end.
+ * Proves the service pattern generalizes: both widgets bind
+ * reactively to their data source, no local state, no polling.
  */
 Rectangle {
     id: bar
@@ -28,14 +28,12 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
     }
 
-    // ── Center label (temporary — clock goes here in 1.6) ────────
-    Text {
-        anchors.centerIn: parent
-        text: Services.HyprlandService.available
-              ? "Nacre"
-              : "waiting for Hyprland..."
-        color: "#666677"
-        font.family: "monospace"
-        font.pixelSize: 12
+    // ── Clock (right-aligned) ──────────────────────────────────
+    // Time-driven data source — proves the pattern works beyond Hyprland.
+    Clock {
+        id: clock
+        anchors.right: parent.right
+        anchors.rightMargin: 8
+        anchors.verticalCenter: parent.verticalCenter
     }
 }

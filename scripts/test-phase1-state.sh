@@ -152,6 +152,25 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════
+# 2e. CLOCK WIDGET — time-driven data source
+# ══════════════════════════════════════════════════════════════════
+header "2e. Clock Widget"
+
+if [[ -f "modules/bar/Clock.qml" ]]; then
+    check "Clock.qml exists"              "test -f modules/bar/Clock.qml"
+    check "Imports Quickshell"            "grep -q 'import Quickshell' modules/bar/Clock.qml"
+    check "Imports config/"               "grep -q 'import.*config' modules/bar/Clock.qml"
+    check "Uses SystemClock"              "grep -q 'SystemClock' modules/bar/Clock.qml"
+    check "Has precision setting"         "grep -q 'precision' modules/bar/Clock.qml"
+    check "Reads Config.clockFormat"      "grep -q 'clockFormat' modules/bar/Clock.qml"
+    check "Uses Qt.formatDateTime"        "grep -q 'Qt.formatDateTime' modules/bar/Clock.qml"
+    check "Registered in qmldir"          "grep -q 'Clock' modules/bar/qmldir"
+    check "BarContent imports Clock"      "grep -q 'Clock' modules/bar/BarContent.qml"
+else
+    info "Clock.qml not found — skipping clock checks"
+fi
+
+# ══════════════════════════════════════════════════════════════════
 # 3. STALE FILES DELETED (config/ should NOT have GlobalStates or Persistent)
 # ══════════════════════════════════════════════════════════════════
 header "3. Stale File Cleanup"
@@ -328,6 +347,7 @@ if [[ $FAIL -eq 0 ]]; then
     echo "  • QML files exist for all singletons"
     echo "  • HyprlandService: singleton, available flag, reactive properties, no UI"
     echo "  • Workspaces widget: Repeater, service binding, switchWorkspace, click-to-switch"
+    echo "  • Clock widget: SystemClock, Config format, Qt.formatDateTime"
     echo "  • Config: valid JSON, enabledByDefault (not visible), clock.format"
     echo "  • State: valid JSON, lastWorkspace round-trips"
     echo "  • No stale imports from old config/GlobalStates, config/Persistent"
