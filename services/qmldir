@@ -1,3 +1,4 @@
 module Nacre.Services
 
-IpcHandler 1.0 IpcHandler.qml
+singleton IpcHandler IpcHandler.qml
+singleton HyprlandService HyprlandService.qml
