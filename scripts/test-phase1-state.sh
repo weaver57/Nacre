@@ -100,6 +100,26 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════
+# 2c. WORKSPACES WIDGET — service → widget binding
+# ══════════════════════════════════════════════════════════════════
+header "2c. Workspaces Widget"
+
+if [[ -f "modules/bar/Workspaces.qml" ]]; then
+    check "Workspaces.qml exists"          "test -f modules/bar/Workspaces.qml"
+    check "Imports services/"              "grep -q 'import.*services' modules/bar/Workspaces.qml"
+    check "Uses HyprlandService"           "grep -q 'HyprlandService' modules/bar/Workspaces.qml"
+    check "Has Repeater"                   "grep -q 'Repeater' modules/bar/Workspaces.qml"
+    check "Binds to workspaces model"      "grep -q 'HyprlandService.workspaces' modules/bar/Workspaces.qml"
+    check "Has switchWorkspace call"        "grep -q 'switchWorkspace' modules/bar/Workspaces.qml"
+    check "Checks focusedWorkspace"         "grep -q 'focusedWorkspace' modules/bar/Workspaces.qml"
+    check "Has MouseArea for click"         "grep -q 'MouseArea' modules/bar/Workspaces.qml"
+    check "Registered in qmldir"           "grep -q 'Workspaces' modules/bar/qmldir"
+    check "BarContent imports Workspaces"   "grep -q 'Workspaces' modules/bar/BarContent.qml"
+else
+    info "Workspaces.qml not found — skipping widget checks"
+fi
+
+# ══════════════════════════════════════════════════════════════════
 # 3. STALE FILES DELETED (config/ should NOT have GlobalStates or Persistent)
 # ══════════════════════════════════════════════════════════════════
 header "3. Stale File Cleanup"
@@ -275,6 +295,7 @@ if [[ $FAIL -eq 0 ]]; then
     echo "  • Directory structure (config/, state/, modules/, components/, services/)"
     echo "  • QML files exist for all singletons"
     echo "  • HyprlandService: singleton, available flag, reactive properties, no UI"
+    echo "  • Workspaces widget: Repeater, service binding, switchWorkspace, click-to-switch"
     echo "  • Config: valid JSON, enabledByDefault (not visible), clock.format"
     echo "  • State: valid JSON, lastWorkspace round-trips"
     echo "  • No stale imports from old config/GlobalStates, config/Persistent"
