@@ -1,0 +1,16 @@
+{
+    "bar": {
+        "height": 32,
+        "position": "top",
+        "enabledByDefault": true
+    },
+    "clock": {
+        "format": "HH:mm"
+    },
+    "theme": "default",
+    "modules": {
+        "bar": {
+            "enabled": true
+        }
+    }
+}

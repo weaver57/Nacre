@@ -1,0 +1,29 @@
+# Qt/QML runtime cache (regenerated automatically, machine-specific)
+.cache/
+*.qmlc
+*.jsc
+
+# Build artifacts (only for C++ plugins, not the shell itself)
+build/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Live config (personal runtime state, not source)
+# These live at ~/.config/nacre/ and ~/.local/state/nacre/ on the actual machine.
+# The repo ships shell.default.json and state.default.json as templates.
+shell.json
+state.json
+
+# Test outputs (runtime artifacts, not source)
+/test-output/
+*.test-result
+scripts/*.log
