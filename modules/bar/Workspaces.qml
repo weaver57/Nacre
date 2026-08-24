@@ -26,19 +26,6 @@ Row {
     spacing: 4
     anchors.verticalCenter: parent.verticalCenter
 
-    // ── Guard: wait for Hyprland to be available ──────────────────
-    // Shows a placeholder until the compositor IPC is responsive.
-    visible: Services.HyprlandService.available
-
-    Text {
-        anchors.verticalCenter: parent.verticalCenter
-        text: "waiting for Hyprland..."
-        color: "#666666"
-        font.family: "monospace"
-        font.pixelSize: 12
-        visible: !Services.HyprlandService.available
-    }
-
     // ── Workspace pills ──────────────────────────────────────────
     // One element per workspace. Model is HyprlandService.workspaces
     // (an ObjectModel<HyprlandWorkspace> from Quickshell.Hyprland).

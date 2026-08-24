@@ -167,11 +167,11 @@ QtObject {
     // is running, Hyprland.workspaces will be populated on startup.
     // Consumers show a placeholder while available is false.
     Component.onCompleted: {
-        if (Hyprland.workspaces && Hyprland.workspaces.count > 0) {
-            available = true
-            console.log("[HyprlandService] available —", Hyprland.workspaces.count, "workspaces")
-        } else {
-            console.log("[HyprlandService] waiting for Hyprland IPC...")
-        }
+        // If the Quickshell.Hyprland import succeeded, the compositor
+        // IPC is alive. No need to wait for workspaces to populate —
+        // the Repeater handles empty models gracefully.
+        available = true
+        console.log("[HyprlandService] available —",
+                    Hyprland.workspaces ? Hyprland.workspaces.count : 0, "workspaces")
     }
 }
