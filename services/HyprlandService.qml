@@ -163,23 +163,10 @@ QtObject {
     function refreshToplevels()  { Hyprland.refreshToplevels() }
 
     // ── Availability detection ────────────────────────────────────
-    // Hyprland's IPC socket paths are the ground truth. If they exist,
-    // the compositor is responsive. We check on first event AND on
-    // Component.onCompleted (covers both fast and slow startup).
-    Connections {
-        target: Hyprland
-        function onRawEvent() {
-            if (!root.available) {
-                root.available = true
-                console.log("[HyprlandService] available — Hyprland IPC responsive")
-            }
-        }
-    }
-
+    // If the Quickshell.Hyprland import succeeded and the compositor
+    // is running, Hyprland.workspaces will be populated on startup.
+    // Consumers show a placeholder while available is false.
     Component.onCompleted: {
-        // If Hyprland loaded without error, the import succeeded,
-        // which means the compositor is at least partially alive.
-        // The rawEvent handler above will confirm full responsiveness.
         if (Hyprland.workspaces && Hyprland.workspaces.count > 0) {
             available = true
             console.log("[HyprlandService] available —", Hyprland.workspaces.count, "workspaces")
