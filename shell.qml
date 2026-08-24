@@ -54,18 +54,15 @@ Scope {
         }
     }
 
-    // ── External control ──────────────────────────────────────────
-    // IPC stub from Phase 0. Real transport + more methods in Phase 1.
-    Services.IpcHandler {
-        id: ipc
-    }
-
     // ── Startup ───────────────────────────────────────────────────
+    // IpcHandler is a singleton — accessed as Services.IpcHandler
+    // anywhere in the shell. No need to instantiate it.
     Component.onCompleted: {
         console.log("[Nacre] initialization order:")
         console.log("  1. Config — height:", Config.Config.barHeight, "position:", Config.Config.barPosition)
         console.log("  2. GlobalStates — barOpen:", State.GlobalStates.barOpen)
         console.log("  3. Persistent — workspace:", State.Persistent.lastWorkspace)
         console.log("[Nacre] started —", Quickshell.screens.length, "monitor(s)")
+        console.log("[IPC] target:", Services.IpcHandler.targetName)
     }
 }
