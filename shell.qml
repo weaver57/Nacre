@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Services.Pipewire
 import "./config" as Config
 import "./state" as State
 import "./components" as Components
@@ -60,6 +61,14 @@ Scope {
     // NOT a singleton — must be a child element to register with
     // Quickshell's IPC system. Instantiated here directly.
     Services.IpcHandler { }
+
+    // ── Pipewire object binding ──────────────────────────────────
+    // PwObjectTracker must live in the QML tree to bind pipewire nodes.
+    // QtObject singletons can't have children, so the tracker lives here.
+    // This makes Pipewire.defaultAudioSink.audio.volume/muted valid.
+    PwObjectTracker {
+        objects: [Pipewire.defaultAudioSink]
+    }
 
     // ── Startup ───────────────────────────────────────────────────
     Component.onCompleted: {
