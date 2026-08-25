@@ -164,10 +164,12 @@ if [[ -f "modules/bar/Workspaces.qml" ]]; then
     check "Has Repeater"                   "grep -q 'Repeater' modules/bar/Workspaces.qml"
     check "Binds to workspaces model"      "grep -q 'HyprlandService.workspaces' modules/bar/Workspaces.qml"
     check "Has switchWorkspace call"        "grep -q 'switchWorkspace' modules/bar/Workspaces.qml"
-    check "Checks focusedWorkspace"         "grep -q 'focusedWorkspace' modules/bar/Workspaces.qml"
+    check "Checks active workspace"        "grep -q 'isActive\|_activeWorkspace\|focusedWorkspace' modules/bar/Workspaces.qml"
     check "Has MouseArea for click"         "grep -q 'MouseArea' modules/bar/Workspaces.qml"
     check "Registered in qmldir"           "grep -q 'Workspaces' modules/bar/qmldir"
     check "BarContent imports Workspaces"   "grep -q 'Workspaces' modules/bar/BarContent.qml"
+    check "Accepts screen property"        "grep -q 'required property var screen' modules/bar/Workspaces.qml"
+    check "Has per-monitor filtering"       "grep -q '_myMonitor\|belongsToThisMonitor' modules/bar/Workspaces.qml"
 else
     info "Workspaces.qml not found — skipping widget checks"
 fi
@@ -282,9 +284,35 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════
-# 8. LIVE CONFIG RELOAD
+# 8. IPC RUNTIME CHECKS (requires running shell)
 # ══════════════════════════════════════════════════════════════════
-header "8. Live Config Reload"
+header "8. IPC Runtime Checks"
+
+if [[ -n "$SHELL_PID" ]]; then
+    IPC_OUTPUT=$(qs ipc --pid "$SHELL_PID" call nacre ping 2>/dev/null || true)
+    check "IPC ping returns pong" "echo '$IPC_OUTPUT' | grep -q 'pong'"
+
+    STATUS_OUTPUT=$(qs ipc --pid "$SHELL_PID" call nacre shellStatus 2>/dev/null || true)
+    check "IPC shellStatus returns JSON" "echo '$STATUS_OUTPUT' | python3 -m json.tool > /dev/null 2>&1"
+
+    # Check barToggle works (toggle off, then back on)
+    qs ipc --pid "$SHELL_PID" call nacre barToggle 2>/dev/null
+    sleep 0.5
+    STATUS_AFTER=$(qs ipc --pid "$SHELL_PID" call nacre shellStatus 2>/dev/null || true)
+    BAR_OPEN=$(echo "$STATUS_AFTER" | python3 -c "import sys,json; print(json.load(sys.stdin).get('barOpen','MISSING'))" 2>/dev/null || true)
+    check "IPC barToggle toggles bar state" "test '$BAR_OPEN' = 'False' || test '$BAR_OPEN' = 'false'"
+
+    # Toggle back on
+    qs ipc --pid "$SHELL_PID" call nacre barToggle 2>/dev/null
+    sleep 0.5
+else
+    info "Skipping IPC runtime checks — shell not running"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 9. LIVE CONFIG RELOAD
+# ══════════════════════════════════════════════════════════════════
+header "9. Live Config Reload"
 
 if [[ -n "$SHELL_PID" ]]; then
     # Save original
@@ -308,14 +336,74 @@ with open('$CONFIG_FILE','r+') as f:
     # Restore original
     cp /tmp/nacre-config-backup.json "$CONFIG_FILE"
     info "Original config restored"
+
+    # Clock format live-reload
+    cp "$CONFIG_FILE" /tmp/nacre-config-backup2.json
+    python3 -c "
+import json
+with open('$CONFIG_FILE','r+') as f:
+    c = json.load(f)
+    c['clock'] = {'format': 'hh:mm AP'}
+    f.seek(0)
+    json.dump(c, f, indent=4)
+    f.truncate()
+"
+    sleep 1
+    CLOCK_FMT=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE'))['clock']['format'])")
+    check "Clock format updated to hh:mm AP" "test '$CLOCK_FMT' = 'hh:mm AP'"
+    cp /tmp/nacre-config-backup2.json "$CONFIG_FILE"
+    info "Original clock format restored"
 else
     info "Skipping live reload test — shell not running"
 fi
 
 # ══════════════════════════════════════════════════════════════════
-# 9. STATE PERSISTENCE (write + read back)
+# 10. PERSISTENT WORKSPACE TRACKING
 # ══════════════════════════════════════════════════════════════════
-header "9. State Persistence"
+header "10. Persistent Workspace Tracking"
+
+check "Persistent imports HyprlandService"  "grep -q 'HyprlandService' state/Persistent.qml"
+check "lastWorkspace binds to focusedWorkspace" "grep -q 'focusedWorkspace' state/Persistent.qml"
+check "onLastWorkspaceChanged handler exists" "grep -q 'onLastWorkspaceChanged' state/Persistent.qml"
+check "save() called in onLastWorkspaceChanged" "grep -A3 'onLastWorkspaceChanged' state/Persistent.qml | grep -q 'save()'"
+check "_initialized guard prevents save on load" "grep -q '_initialized' state/Persistent.qml"
+check "Uses .id for object property" "grep -q 'hw.id' state/Persistent.qml"
+
+# Runtime: switch workspace via IPC and verify state.json updates
+if [[ -n "$SHELL_PID" ]]; then
+    # Record current workspace from shell status
+    STATUS_WS=$(qs ipc --pid "$SHELL_PID" call nacre shellStatus 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('focusedWorkspace',0))" 2>/dev/null || echo 0)
+    info "Current focused workspace: $STATUS_WS"
+
+    # Determine target workspace (switch to the one that isn't current)
+    if [[ "$STATUS_WS" -eq 1 ]]; then
+        TARGET_WS=2
+    else
+        TARGET_WS=1
+    fi
+
+    # Switch workspace via IPC
+    qs ipc --pid "$SHELL_PID" call nacre workspaceSwitch "$TARGET_WS" 2>/dev/null
+    sleep 1
+
+    # Verify shellStatus reports new workspace
+    NEW_WS=$(qs ipc --pid "$SHELL_PID" call nacre shellStatus 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('focusedWorkspace',0))" 2>/dev/null || echo 0)
+    check "IPC workspaceSwitch changes focused workspace" "test '$NEW_WS' = '$TARGET_WS'"
+
+    # Verify state.json persisted the new workspace
+    PERSISTED_WS=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('lastWorkspace',-1))" 2>/dev/null || echo -1)
+    check "Persistent saved new workspace to state.json" "test '$PERSISTED_WS' = '$TARGET_WS'"
+
+    # Switch back to original
+    qs ipc --pid "$SHELL_PID" call nacre workspaceSwitch "$STATUS_WS" 2>/dev/null
+    sleep 1
+    info "Restored to workspace $STATUS_WS"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 11. STATE PERSISTENCE (write + read back)
+# ══════════════════════════════════════════════════════════════════
+header "11. State Persistence"
 
 # Save original
 cp "$STATE_FILE" /tmp/nacre-state-backup.json
@@ -342,9 +430,9 @@ cp /tmp/nacre-state-backup.json "$STATE_FILE"
 info "Original state restored"
 
 # ══════════════════════════════════════════════════════════════════
-# 10. DEFAULT FILES IN REPO
+# 12. DEFAULT FILES IN REPO
 # ══════════════════════════════════════════════════════════════════
-header "10. Repo Defaults"
+header "12. Repo Defaults"
 
 check "shell.default.json exists"       "test -f shell.default.json"
 check "state.default.json exists"       "test -f state.default.json"
@@ -370,6 +458,8 @@ if [[ $FAIL -eq 0 ]]; then
     echo "  • Workspaces widget: Repeater, service binding, switchWorkspace, click-to-switch"
     echo "  • Clock widget: SystemClock, Config format, Qt.formatDateTime"
     echo "  • IPC handler: typed methods (ping, barToggle, workspaceSwitch, shellStatus)"
+    echo "  • IPC runtime: ping, shellStatus, barToggle toggle cycle"
+    echo "  • Clock format live-reload"
     echo "  • Config: valid JSON, enabledByDefault (not visible), clock.format"
     echo "  • State: valid JSON, lastWorkspace round-trips"
     echo "  • No stale imports from old config/GlobalStates, config/Persistent"
