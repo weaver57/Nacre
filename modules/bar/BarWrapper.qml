@@ -3,19 +3,19 @@ import QtQuick
 /**
  * BarWrapper — the bar module's entry point.
  *
- * Layer 1 of the three-layer pattern:
- *   Wrapper (this) → Loader → Content (BarContent)
- *
- * ContentWindow already gates visibility via GlobalStates.barOpen,
- * so the Loader here is for module-level content, not window visibility.
+ * Layer 1 of the three-layer pattern.
+ * Receives `screen` from ContentWindow and passes it to BarContent
+ * so widgets can filter by monitor.
  */
 Item {
     id: wrapper
 
+    required property var screen
+
     anchors.fill: parent
 
-    // ── Load the real bar content ──────────────────────────────
     BarContent {
         anchors.fill: parent
+        screen: wrapper.screen
     }
 }

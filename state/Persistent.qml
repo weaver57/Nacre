@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick
 import Quickshell.Io
+import "../services" as Services
 
 /**
  * Persistent — runtime state that should survive restarts.
@@ -30,7 +31,22 @@ QtObject {
     property var _raw: _file.loaded ? JSON.parse(_file.text()) : ({})
 
     // ── Workspace ─────────────────────────────────────────────────
-    property int lastWorkspace: _raw.lastWorkspace ?? 1
+    // Binds to HyprlandService.focusedWorkspace for live tracking.
+    // Falls back to persisted value when HyprlandService isn't ready yet.
+    // Auto-saves on every change (with init guard to skip the first load).
+    // NOTE: focusedWorkspace is a HyprlandWorkspace object, not an int —
+    // we need .id to get the numeric workspace ID.
+    property int lastWorkspace: {
+        var hw = Services.HyprlandService.focusedWorkspace
+        return (hw && hw.id > 0) ? hw.id : (_raw.lastWorkspace ?? 1)
+    }
+    property bool _initialized: false
+    onLastWorkspaceChanged: {
+        if (_initialized) {
+            save()
+            console.log("[Persistent] saved workspace:", lastWorkspace)
+        }
+    }
 
     // ── Notification history ──────────────────────────────────────
     property var notificationHistory: {
@@ -49,6 +65,7 @@ QtObject {
     }
 
     Component.onCompleted: {
+        _initialized = true
         console.log("[Persistent] loaded — workspace:", lastWorkspace)
         console.log("[Persistent] path:", statePath)
     }

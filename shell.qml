@@ -49,7 +49,9 @@ Scope {
                 screen: modelData
 
                 // Bar module — visible if Config enabled AND GlobalStates.open
-                Bar.BarWrapper { }
+                Bar.BarWrapper {
+                    screen: modelData
+                }
             }
         }
     }

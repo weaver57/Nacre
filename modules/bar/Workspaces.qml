@@ -4,34 +4,50 @@ import "../../services" as Services
 /**
  * Workspaces — workspace indicator for the bar.
  *
- * PROVES THE SERVICE LOOP:
- *   1. Compositor event (workspace changed) → Hyprland's event socket fires
- *   2. Hyprland's properties update → HyprlandService aliases update
- *   3. Repeater model updates → pill visual states re-render
- *   4. User clicks a pill → HyprlandService.switchWorkspace(id)
- *   5. Hyprland.dispatch("workspace N") → compositor switches
- *   6. Back to step 1
+ * Per-monitor: each ContentWindow renders its own Workspaces.
+ * This widget filters to show only the workspaces assigned to
+ * this bar's monitor, identified via HyprlandService.monitorFor(screen).
  *
- * If this full loop works, the architecture is validated end-to-end.
- *
- * Per-monitor note:
- *   Each ContentWindow renders its own Workspaces. For now, all monitors
- *   show the same global workspace list. Per-monitor filtering (showing
- *   only that monitor's workspaces) comes when we wire monitor-awareness
- *   into the bar layout.
+ * The active pill reflects THIS monitor's focused workspace,
+ * not the global focus — critical for multi-monitor correctness.
  */
 Row {
     id: root
 
+    required property var screen
+
     spacing: 4
     anchors.verticalCenter: parent.verticalCenter
 
+    // ── Per-monitor filtering ────────────────────────────────────
+    // Get the HyprlandMonitor for this bar's screen.
+    // HyprlandService.monitors is an ObjectModel — we search by name.
+    readonly property var _myMonitor: {
+        if (!Services.HyprlandService.available) return null
+        var screenName = root.screen.name
+        for (var i = 0; i < Services.HyprlandService.monitors.count; i++) {
+            var m = Services.HyprlandService.monitors.get(i)
+            if (m.name === screenName) return m
+        }
+        return null
+    }
+
+    // This monitor's currently active workspace (for highlighting the right pill)
+    // Falls back to global focusedWorkspace if per-monitor lookup fails.
+    readonly property var _activeWorkspace:
+        _myMonitor && _myMonitor.activeWorkspace ? _myMonitor.activeWorkspace
+        : Services.HyprlandService.focusedWorkspace
+
+    Component.onCompleted: {
+        var screenName = root.screen.name
+        var found = _myMonitor !== null
+        console.log("[Workspaces] screen:", screenName, "monitor found:", found)
+        if (found) console.log("[Workspaces] monitor:", _myMonitor.name, "active:", _activeWorkspace ? _activeWorkspace.id : "none")
+    }
+
     // ── Workspace pills ──────────────────────────────────────────
-    // One element per workspace. Model is HyprlandService.workspaces
-    // (an ObjectModel<HyprlandWorkspace> from Quickshell.Hyprland).
-    //
-    // Each workspace has: id, name, focused, active, monitor, toplevels
-    // We bind the visual "active" state to focusedWorkspace.id from the service.
+    // Filter: only show workspaces whose monitor matches this bar's monitor.
+    // HyprlandWorkspace has a `monitor` property (HyprlandMonitor).
     Repeater {
         id: repeater
         model: Services.HyprlandService.workspaces
@@ -39,40 +55,47 @@ Row {
         Rectangle {
             id: pill
 
-            required property var modelData   // HyprlandWorkspace
+            required property var modelData
             readonly property int wsId: modelData.id
             readonly property string wsName: modelData.name ?? wsId
-            readonly property bool isFocused:
-                Services.HyprlandService.focusedWorkspace !== null
-                && Services.HyprlandService.focusedWorkspace.id === wsId
+
+            // Is this workspace on this bar's monitor?
+            // Fallback: if monitor lookup fails, show all workspaces
+            readonly property bool belongsToThisMonitor:
+                root._myMonitor === null
+                || (modelData.monitor !== null && modelData.monitor.name === root._myMonitor.name)
+
+            // Is this the active workspace on THIS monitor?
+            readonly property bool isActive:
+                root._activeWorkspace !== null
+                && root._activeWorkspace.id === wsId
+
+            // Hide workspaces that belong to other monitors
+            visible: belongsToThisMonitor
 
             width: Math.max(28, wsLabel.implicitWidth + 16)
             height: 22
             radius: 4
 
-            // ── Visual state ────────────────────────────────────
-            // Focused workspace: bright accent. Others: subtle.
-            color: isFocused ? "#7c3aed" : "#3d3d5c"
-            border.color: isFocused ? "#a78bfa" : "transparent"
-            border.width: isFocused ? 1 : 0
+            color: isActive ? "#7c3aed" : "#3d3d5c"
+            border.color: isActive ? "#a78bfa" : "transparent"
+            border.width: isActive ? 1 : 0
 
             Behavior on color {
                 ColorAnimation { duration: 150 }
             }
 
-            // ── Workspace label ─────────────────────────────────
             Text {
                 id: wsLabel
                 anchors.centerIn: parent
                 text: pill.wsName
-                color: pill.isFocused ? "#ffffff" : "#a0a0b0"
+                color: pill.isActive ? "#ffffff" : "#a0a0b0"
                 font.family: "monospace"
                 font.pixelSize: 11
-                font.bold: pill.isFocused
+                font.bold: pill.isActive
             }
 
-            // ── Window count indicator ──────────────────────────
-            // Small dot below the pill if workspace has windows.
+            // Window count indicator
             Rectangle {
                 visible: pill.modelData.toplevels && pill.modelData.toplevels.count > 0
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -81,14 +104,9 @@ Row {
                 width: 4
                 height: 4
                 radius: 2
-                color: pill.isFocused ? "#a78bfa" : "#555577"
+                color: pill.isActive ? "#a78bfa" : "#555577"
             }
 
-            // ── Click to switch ─────────────────────────────────
-            // THIS IS THE CRITICAL PROOF POINT:
-            //   user click → service function → Hyprland.dispatch()
-            //   → compositor switches → event fires → service updates
-            //   → Repeater re-renders → isFocused flips → pill highlights
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
