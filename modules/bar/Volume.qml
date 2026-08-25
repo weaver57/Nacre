@@ -5,11 +5,11 @@ import "../../services" as Services
  * Volume — global volume indicator and control for the bar.
  *
  * Shows speaker icon + volume percentage.
- * - Scroll up/down: adjust volume by 5% steps (AudioService.scrollStep)
+ * - Scroll up/down: adjust volume by 2% steps (AudioService.scrollStep)
  * - Click: toggle mute
  *
  * This is the first scrollable widget in Nacre. The scroll-to-action
- * pattern (scroll step = 5%) is documented in CONVENTIONS.md for
+ * pattern (scroll step = 2%) is documented in CONVENTIONS.md for
  * consistency with future scrollable widgets.
  *
  * Colors are hardcoded (Phase 2 acceptable debt, themed in Phase 4).
@@ -51,16 +51,12 @@ Item {
     }
 
     // ── Scroll to adjust volume ──────────────────────────────────
-    // One scroll step = AudioService.scrollStep (5%).
-    // This is the first scrollable widget — the pattern is documented
-    // in CONVENTIONS.md for consistency with future scroll widgets.
+    // Normalize by 120 (one standard wheel notch) so trackpad sub-events
+    // don't stack. One physical notch = scrollStep (2%).
     WheelHandler {
         onWheel: (event) => {
-            if (event.angleDelta.y > 0) {
-                Services.AudioService.adjustVolume(Services.AudioService.scrollStep)
-            } else if (event.angleDelta.y < 0) {
-                Services.AudioService.adjustVolume(-Services.AudioService.scrollStep)
-            }
+            var steps = event.angleDelta.y / 120
+            Services.AudioService.adjustVolume(steps * Services.AudioService.scrollStep)
         }
     }
 

@@ -250,11 +250,13 @@ if [[ -f "services/AudioService.qml" ]]; then
     check "Has muted property"               "grep -q 'property bool muted' services/AudioService.qml"
     check "Volume normalized 0.0-1.0"        "grep -q '0.0\|0.0-1.0\|scrollStep' services/AudioService.qml"
     check "Has scrollStep property"          "grep -q 'scrollStep' services/AudioService.qml"
+    check "scrollStep is 0.02"               "grep -q 'scrollStep: 0.02' services/AudioService.qml"
     check "Has setVolume function"           "grep -q 'function setVolume' services/AudioService.qml"
     check "Has toggleMute function"          "grep -q 'function toggleMute' services/AudioService.qml"
     check "Has adjustVolume function"        "grep -q 'function adjustVolume' services/AudioService.qml"
     check "Uses wpctl for writes"            "grep -q 'wpctl' services/AudioService.qml"
     check "setVolume clamps input"           "grep -q 'Math.max\|Math.min\|clamped' services/AudioService.qml"
+    check "No exitCode reference"            "! grep -q 'exitCode' services/AudioService.qml"
     check "No visual elements"               "! grep -qE 'Rectangle|Text|Item \{' services/AudioService.qml"
     check "Registered in qmldir"             "grep -q 'AudioService' services/qmldir"
 else
@@ -276,6 +278,7 @@ if [[ -f "modules/bar/Volume.qml" ]]; then
     check "Has MouseArea for click-to-mute"  "grep -q 'MouseArea' modules/bar/Volume.qml"
     check "Calls toggleMute on click"        "grep -q 'toggleMute' modules/bar/Volume.qml"
     check "Uses scrollStep"                  "grep -q 'scrollStep' modules/bar/Volume.qml"
+    check "Normalizes wheel delta by 120"    "grep -q 'angleDelta.y / 120' modules/bar/Volume.qml"
     check "Registered in qmldir"             "grep -q 'Volume' modules/bar/qmldir"
     check "BarContent imports Volume"        "grep -q 'Volume' modules/bar/BarContent.qml"
     check "Is global widget (no screen prop)" "! grep -q 'required property.*screen\|property var screen' modules/bar/Volume.qml"
@@ -397,6 +400,23 @@ if [[ -n "$SHELL_PID" ]]; then
     sleep 0.5
 else
     info "Skipping IPC runtime checks — shell not running"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 8b. KEYBIND VERIFICATION — audio uses wpctl 2% steps
+# ══════════════════════════════════════════════════════════════════
+header "8b. Audio Keybinds"
+
+KEYBIND_FILE="$HOME/.config/hypr/keybindings.conf"
+if [[ -f "$KEYBIND_FILE" ]]; then
+    check "XF86AudioRaiseVolume uses wpctl"  "grep 'XF86AudioRaiseVolume' '$KEYBIND_FILE' | grep -q 'wpctl'"
+    check "XF86AudioLowerVolume uses wpctl"  "grep 'XF86AudioLowerVolume' '$KEYBIND_FILE' | grep -q 'wpctl'"
+    check "Raise volume uses 0.02+"          "grep 'XF86AudioRaiseVolume' '$KEYBIND_FILE' | grep -Fq '0.02+'"
+    check "Lower volume uses 0.02-"          "grep 'XF86AudioLowerVolume' '$KEYBIND_FILE' | grep -Fq '0.02-'"
+    check "F3 raise uses 0.02+"              "grep ', F3,' '$KEYBIND_FILE' | grep -Fq '0.02+'"
+    check "F2 lower uses 0.02-"              "grep ', F2,' '$KEYBIND_FILE' | grep -Fq '0.02-'"
+else
+    info "Keybindings file not found — skipping"
 fi
 
 # ══════════════════════════════════════════════════════════════════

@@ -40,7 +40,7 @@ QtObject {
     // ── Scroll step size ─────────────────────────────────────────
     // One scroll step = 5% volume change. Documented in CONVENTIONS.md
     // so all future scrollable widgets use the same ratio.
-    readonly property real scrollStep: 0.05
+    readonly property real scrollStep: 0.02
 
     // ── wpctl wrapper ────────────────────────────────────────────
     // All write actions go through wpctl for reliability.
@@ -60,13 +60,12 @@ QtObject {
         _process.command = ["wpctl", "set-volume", "@DEFAULT_SINK@",
                             clamped.toFixed(2)]
         _process.running = true
-        console.log("[AudioService] set volume:", clamped.toFixed(2))
     }
 
     /**
      * Adjust volume by a delta (-1.0 to 1.0).
      * Convenience wrapper for scroll/keybind interaction.
-     * One scroll step = scrollStep (0.05 = 5%).
+     * One scroll step = scrollStep (2% = 0.02).
      */
     function adjustVolume(delta) {
         var newVol = Math.max(0.0, Math.min(1.0, volume + delta))
