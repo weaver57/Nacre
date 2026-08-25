@@ -194,6 +194,96 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════
+# 2f. BATTERYSERVICE — read-only UPower wrapper
+# ══════════════════════════════════════════════════════════════════
+header "2f. BatteryService"
+
+if [[ -f "services/BatteryService.qml" ]]; then
+    check "BatteryService.qml exists"       "test -f services/BatteryService.qml"
+    check "Has pragma Singleton"             "grep -q 'pragma Singleton' services/BatteryService.qml"
+    check "Imports UPower"                   "grep -q 'Quickshell.Services.UPower' services/BatteryService.qml"
+    check "Has available property"           "grep -q 'property bool available' services/BatteryService.qml"
+    check "available checks isLaptopBattery" "grep -q 'isLaptopBattery' services/BatteryService.qml"
+    check "Has percentage property"          "grep -q 'property real percentage' services/BatteryService.qml"
+    check "Has charging property"            "grep -q 'property bool charging' services/BatteryService.qml"
+    check "Has state property"               "grep -q 'property string state' services/BatteryService.qml"
+    check "State maps to clean strings"      "grep -q '"charging"' services/BatteryService.qml"
+    check "No action methods"                "! grep -q 'function.*action\|function.*toggle\|function.*set' services/BatteryService.qml"
+    check "No visual elements"               "! grep -qE 'Rectangle|Text|Item \{' services/BatteryService.qml"
+    check "Has _scanDevices function"         "grep -q 'function _scanDevices' services/BatteryService.qml"
+    check "Uses Qt.callLater for async"       "grep -q 'Qt.callLater' services/BatteryService.qml"
+    check "Scans UPower.devices.values"       "grep -q 'UPower.devices.values' services/BatteryService.qml"
+    check "Registered in qmldir"             "grep -q 'BatteryService' services/qmldir"
+else
+    info "BatteryService.qml not found — skipping"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 2g. BATTERY WIDGET — global (non-per-monitor)
+# ══════════════════════════════════════════════════════════════════
+header "2g. Battery Widget"
+
+if [[ -f "modules/bar/Battery.qml" ]]; then
+    check "Battery.qml exists"              "test -f modules/bar/Battery.qml"
+    check "Imports services/"               "grep -q 'import.*services' modules/bar/Battery.qml"
+    check "Uses BatteryService"             "grep -q 'BatteryService' modules/bar/Battery.qml"
+    check "Guards on available"             "grep -q 'BatteryService.available' modules/bar/Battery.qml"
+    check "Registered in qmldir"            "grep -q 'Battery' modules/bar/qmldir"
+    check "BarContent imports Battery"      "grep -q 'Battery' modules/bar/BarContent.qml"
+    check "Is global widget (no screen prop)" "! grep -q 'required property.*screen\|property var screen' modules/bar/Battery.qml"
+else
+    info "Battery.qml not found — skipping"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 2h. AUDIOSERVICE — Pipewire wrapper with volume/mute/actions
+# ══════════════════════════════════════════════════════════════════
+header "2h. AudioService"
+
+if [[ -f "services/AudioService.qml" ]]; then
+    check "AudioService.qml exists"         "test -f services/AudioService.qml"
+    check "Has pragma Singleton"             "grep -q 'pragma Singleton' services/AudioService.qml"
+    check "Imports Pipewire"                 "grep -q 'Quickshell.Services.Pipewire' services/AudioService.qml"
+    check "Imports Quickshell.Io"            "grep -q 'Quickshell.Io' services/AudioService.qml"
+    check "Has available property"           "grep -q 'property bool available' services/AudioService.qml"
+    check "Has volume property"              "grep -q 'property real volume' services/AudioService.qml"
+    check "Has muted property"               "grep -q 'property bool muted' services/AudioService.qml"
+    check "Volume normalized 0.0-1.0"        "grep -q '0.0\|0.0-1.0\|scrollStep' services/AudioService.qml"
+    check "Has scrollStep property"          "grep -q 'scrollStep' services/AudioService.qml"
+    check "Has setVolume function"           "grep -q 'function setVolume' services/AudioService.qml"
+    check "Has toggleMute function"          "grep -q 'function toggleMute' services/AudioService.qml"
+    check "Has adjustVolume function"        "grep -q 'function adjustVolume' services/AudioService.qml"
+    check "Uses wpctl for writes"            "grep -q 'wpctl' services/AudioService.qml"
+    check "setVolume clamps input"           "grep -q 'Math.max\|Math.min\|clamped' services/AudioService.qml"
+    check "No visual elements"               "! grep -qE 'Rectangle|Text|Item \{' services/AudioService.qml"
+    check "Registered in qmldir"             "grep -q 'AudioService' services/qmldir"
+else
+    info "AudioService.qml not found — skipping"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 2i. VOLUME WIDGET — global, scrollable
+# ══════════════════════════════════════════════════════════════════
+header "2i. Volume Widget"
+
+if [[ -f "modules/bar/Volume.qml" ]]; then
+    check "Volume.qml exists"                "test -f modules/bar/Volume.qml"
+    check "Imports services/"                "grep -q 'import.*services' modules/bar/Volume.qml"
+    check "Uses AudioService"                "grep -q 'AudioService' modules/bar/Volume.qml"
+    check "Guards on available"              "grep -q 'AudioService.available' modules/bar/Volume.qml"
+    check "Has WheelHandler for scroll"      "grep -q 'WheelHandler' modules/bar/Volume.qml"
+    check "Calls adjustVolume on scroll"     "grep -q 'adjustVolume' modules/bar/Volume.qml"
+    check "Has MouseArea for click-to-mute"  "grep -q 'MouseArea' modules/bar/Volume.qml"
+    check "Calls toggleMute on click"        "grep -q 'toggleMute' modules/bar/Volume.qml"
+    check "Uses scrollStep"                  "grep -q 'scrollStep' modules/bar/Volume.qml"
+    check "Registered in qmldir"             "grep -q 'Volume' modules/bar/qmldir"
+    check "BarContent imports Volume"        "grep -q 'Volume' modules/bar/BarContent.qml"
+    check "Is global widget (no screen prop)" "! grep -q 'required property.*screen\|property var screen' modules/bar/Volume.qml"
+else
+    info "Volume.qml not found — skipping"
+fi
+
+# ══════════════════════════════════════════════════════════════════
 # 3. STALE FILES DELETED (config/ should NOT have GlobalStates or Persistent)
 # ══════════════════════════════════════════════════════════════════
 header "3. Stale File Cleanup"
