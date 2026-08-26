@@ -66,19 +66,20 @@ property var workspaces: Hyprland.workspaces
 property alias workspaces: Hyprland.workspaces
 ```
 
-### Rule 3: No visual children inside `QtObject`
+### Rule 3: No *visual* children inside `QtObject`
 
-`QtObject` has no default property for children. Visual types (`Connections`, `Timer`, `Rectangle`, `Item`) cannot be nested inside it. Use `Component.onCompleted` for startup logic.
+`QtObject` cannot hold **visual** types (`Rectangle`, `Item`, `Text`). Non-visual helper objects that are plain QObjects (`Timer`, `Process`, `FileView`, `SplitParser`) are fine — they live in the object's resources and are used by AudioService and NetworkService. Use `Component.onCompleted` for startup logic.
 
 ```qml
 // ✅ Correct
 QtObject {
+    property var _timer: Timer { interval: 5000; running: true }
     Component.onCompleted: { /* ... */ }
 }
 
-// ❌ Wrong — Connections is a visual Item
+// ❌ Wrong — Rectangle is a visual Item
 QtObject {
-    Connections { target: Hyprland; ... }
+    property var _box: Rectangle { color: "red" }
 }
 ```
 
@@ -156,6 +157,32 @@ Service → wraps external source (Hyprland, D-Bus, etc.)
 ```
 
 **Never:** `Widget → imports Quickshell.Hyprland directly`
+
+### Scroll interaction convention
+
+One wheel step = a fixed delta owned by the service, so every scrollable widget behaves the same:
+
+- `AudioService.scrollStep = 0.02` (2% per wheel step)
+- Widgets normalize raw wheel input by `angleDelta.y / 120` before calling `adjustVolume(delta)`
+- Any future scrollable widget must declare its step size on its service, never hardcode it in the widget
+
+### NetworkService (direct NetworkManager — Strategy A)
+
+Quickshell ships `Quickshell.Networking` in this build — a first-party, event-driven NetworkManager binding over the system D-Bus. The service binds to it reactively; NM pushes D-Bus property-change signals, and there is **no polling timer and no subprocess** anywhere.
+
+- `available` means "NetworkManager is reachable and reporting", **not** "currently connected" — disconnected is expressed via `connectionType === "disconnected"`
+- Never compare device-type enum magic numbers: this build's numbering differs from raw NM D-Bus values. Detect wifi by capability (device exposes a `networks` model)
+- `WifiNetwork.signalStrength` is normalized 0.0–1.0 by the binding; the service scales it to 0–100 so widgets never do unit math
+- Read-only in Phase 2 — the binding exposes connect/disconnect, but this service deliberately does not surface those until a network-management module exists
+
+### TrayService (StatusNotifierItem passthrough)
+
+Structurally the thinnest service in Nacre: tray items are externally-owned, dynamically appearing/disappearing processes — the service is a clean-typed pass-through of `Quickshell.Services.SystemTray`, not a data owner.
+
+- **Left-click activate only (Phase 2 scope limit, spec 2.1.2/2.6.4):** right-click context menus and the DBusMenu popup surface are explicitly deferred. This is a documented, intentional gap — if you find yourself wanting `secondaryActivate()` or menu rendering, that is new scope, schedule it as its own slice.
+- Tray items arrive asynchronously after startup; the item list is a reactive binding, never polled or copied into local arrays.
+- `TrayService.available` means "at least one tray item registered" — an empty tray hides the widget rather than leaving a gap in the bar.
+- The widget owns no state (same rule as Workspaces): icons, tooltips and activation all come from the service's items.
 
 ### HyprlandService (worked example)
 

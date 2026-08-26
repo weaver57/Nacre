@@ -4,3 +4,5 @@ IpcHandler 1.0 IpcHandler.qml
 singleton HyprlandService HyprlandService.qml
 singleton BatteryService BatteryService.qml
 singleton AudioService AudioService.qml
+singleton NetworkService NetworkService.qml
+singleton TrayService TrayService.qml

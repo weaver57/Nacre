@@ -147,7 +147,8 @@ for qmldir_file in config/qmldir state/qmldir services/qmldir; do
     fi
 done
 
-# Rule 2: shell.qml must not instantiate singletons with {}    check "No singleton instantiation in shell.qml" "! grep -qE '(HyprlandService|Config|GlobalStates|Persistent)\s*\{' shell.qml"
+# Rule 2: shell.qml must not instantiate singletons with {}
+check "No singleton instantiation in shell.qml" "! grep -qE '(HyprlandService|Config|GlobalStates|Persistent)\s*\{' shell.qml"
 
 # Rule 3: No property alias to imported singletons anywhere
 check "No alias to imported singletons" "! grep -rE 'property alias.*: (Hyprland|Config|GlobalStates|Persistent)\.' --include='*.qml' . 2>/dev/null | grep -v '^[[:space:]]*\*' | grep -v '^[[:space:]]*//' | grep -q ."
@@ -194,9 +195,9 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════
-# 2f. BATTERYSERVICE — read-only UPower wrapper
+# 2fb. BATTERYSERVICE — read-only UPower wrapper
 # ══════════════════════════════════════════════════════════════════
-header "2f. BatteryService"
+header "2fb. BatteryService"
 
 if [[ -f "services/BatteryService.qml" ]]; then
     check "BatteryService.qml exists"       "test -f services/BatteryService.qml"
@@ -210,9 +211,9 @@ if [[ -f "services/BatteryService.qml" ]]; then
     check "State maps to clean strings"      "grep -q '"charging"' services/BatteryService.qml"
     check "No action methods"                "! grep -q 'function.*action\|function.*toggle\|function.*set' services/BatteryService.qml"
     check "No visual elements"               "! grep -qE 'Rectangle|Text|Item \{' services/BatteryService.qml"
-    check "Has _scanDevices function"         "grep -q 'function _scanDevices' services/BatteryService.qml"
-    check "Uses Qt.callLater for async"       "grep -q 'Qt.callLater' services/BatteryService.qml"
-    check "Scans UPower.devices.values"       "grep -q 'UPower.devices.values' services/BatteryService.qml"
+    check "Reactive scan of UPower.devices"      "grep -q 'UPower.devices.values' services/BatteryService.qml"
+    check "Aggregates multiple batteries (energyFull weighting)" "grep -q 'energyFull' services/BatteryService.qml"
+    check "No callLater retry hack"              "! grep -q 'Qt.callLater' services/BatteryService.qml"
     check "Registered in qmldir"             "grep -q 'BatteryService' services/qmldir"
 else
     info "BatteryService.qml not found — skipping"
@@ -284,6 +285,48 @@ if [[ -f "modules/bar/Volume.qml" ]]; then
     check "Is global widget (no screen prop)" "! grep -q 'required property.*screen\|property var screen' modules/bar/Volume.qml"
 else
     info "Volume.qml not found — skipping"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 2j. NETWORKSERVICE — direct NetworkManager binding (Strategy A)
+# ══════════════════════════════════════════════════════════════════
+header "2j. NetworkService"
+
+if [[ -f "services/NetworkService.qml" ]]; then
+    check "NetworkService.qml exists"       "test -f services/NetworkService.qml"
+    check "Has pragma Singleton"             "grep -q 'pragma Singleton' services/NetworkService.qml"
+    check "Imports Quickshell.Networking"    "grep -q 'import Quickshell.Networking' services/NetworkService.qml"
+    check "Has available property"           "grep -q 'property bool available' services/NetworkService.qml"
+    check "Has connectionType property"      "grep -q 'property string connectionType' services/NetworkService.qml"
+    check "Has ssid property"                "grep -q 'property string ssid' services/NetworkService.qml"
+    check "Has signalStrength property"      "grep -q 'property int signalStrength' services/NetworkService.qml"
+    check "Event-driven (binds Networking)"  "grep -q 'Networking.devices' services/NetworkService.qml"
+    check "No subprocess spawning"           "! grep -q 'Process {' services/NetworkService.qml"
+    check "No nmcli anywhere"                "! grep -q 'nmcli' services/NetworkService.qml"
+    check "No polling timer"                 "! grep -q 'Timer {' services/NetworkService.qml"
+    check "No visual elements"               "! grep -qE 'Rectangle|Text|Item \{' services/NetworkService.qml"
+    check "Registered in qmldir"             "grep -q 'NetworkService' services/qmldir"
+else
+    info "NetworkService.qml not found — skipping"
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 2k. NETWORK WIDGET — global, read-only status
+# ══════════════════════════════════════════════════════════════════
+header "2k. Network Widget"
+
+if [[ -f "modules/bar/Network.qml" ]]; then
+    check "Network.qml exists"               "test -f modules/bar/Network.qml"
+    check "Imports services/"                "grep -q 'import.*services' modules/bar/Network.qml"
+    check "Uses NetworkService"              "grep -q 'NetworkService' modules/bar/Network.qml"
+    check "Guards on available"              "grep -q 'NetworkService.available' modules/bar/Network.qml"
+    check "Displays SSID"                    "grep -q 'ssid' modules/bar/Network.qml"
+    check "Displays connection type"         "grep -q 'connectionType' modules/bar/Network.qml"
+    check "Registered in qmldir"             "grep -q 'Network' modules/bar/qmldir"
+    check "BarContent imports Network"       "grep -q 'Network' modules/bar/BarContent.qml"
+    check "Is global widget (no screen prop)" "! grep -q 'required property.*screen\|property var screen' modules/bar/Network.qml"
+else
+    info "Network.qml not found — skipping"
 fi
 
 # ══════════════════════════════════════════════════════════════════
@@ -362,6 +405,16 @@ check "ContentWindow imports ../state"   "grep -q 'import \"../state\"' componen
 check "No stale config/GlobalStates import" "! grep -r 'config.*GlobalStates' --include='*.qml' . 2>/dev/null"
 # No file should import Persistent from config/
 check "No stale config/Persistent import"   "! grep -r 'config.*Persistent' --include='*.qml' . 2>/dev/null"
+
+# ── 6b. Portability & Position Wiring ──
+header "6b. Portability & Position Wiring"
+
+check "No hardcoded home paths in QML"      "! grep -rE '/home/[a-zA-Z]' --include='*.qml' . 2>/dev/null | grep -q ."
+check "Config resolves XDG_CONFIG_HOME"     "grep -q 'XDG_CONFIG_HOME' config/Config.qml"
+check "Persistent resolves XDG_STATE_HOME"  "grep -q 'XDG_STATE_HOME' state/Persistent.qml"
+DEFAULT_WS=$(python3 -c "import json; print(json.load(open('state.default.json')).get('lastWorkspace','MISSING'))")
+check "state.default.json lastWorkspace is 1" "test '$DEFAULT_WS' = '1'"
+check "ContentWindow anchors follow bar.position" "grep -q 'isBarAtTop' components/ContentWindow.qml && grep -q 'isBarAtBottom' components/ContentWindow.qml"
 
 # ══════════════════════════════════════════════════════════════════
 # 7. SHELL PROCESS

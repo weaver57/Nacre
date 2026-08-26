@@ -6,12 +6,12 @@ import "../../services" as Services
  * BarContent — the actual bar layout.
  *
  * Layout:
- *   [workspaces] ........................ [volume] [battery] [clock]
+ *   [workspaces] ................ [tray] [network] [volume] [battery] [clock]
  *
  * screen is threaded from ContentWindow → BarWrapper → BarContent → Workspaces
  * so the Workspaces widget can filter workspaces by monitor.
  *
- * Volume, Battery are global widgets (same on all monitors).
+ * Network, Volume, Battery are global widgets (same on all monitors).
  */
 Rectangle {
     id: bar
@@ -51,6 +51,25 @@ Rectangle {
     Volume {
         id: volume
         anchors.right: battery.left
+        anchors.rightMargin: 12
+        anchors.verticalCenter: parent.verticalCenter
+    }
+
+    // ── Tray (right-aligned, left of network) ───────────────────
+    // Global widget — tray items are session-wide, not per-monitor.
+    // Hidden entirely when no tray items are registered.
+    Tray {
+        id: tray
+        anchors.right: network.left
+        anchors.rightMargin: 12
+        anchors.verticalCenter: parent.verticalCenter
+    }
+
+    // ── Network (right-aligned, left of volume) ─────────────────
+    // Global widget — network status is the same on every screen.
+    Network {
+        id: network
+        anchors.right: volume.left
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
     }
