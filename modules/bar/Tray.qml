@@ -85,6 +85,7 @@ Item {
                 MouseArea {
                     id: clickArea
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: (event) => {
                         if (event.button === Qt.LeftButton)
