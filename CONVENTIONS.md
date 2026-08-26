@@ -162,7 +162,7 @@ Service → wraps external source (Hyprland, D-Bus, etc.)
 
 One wheel step = a fixed delta owned by the service, so every scrollable widget behaves the same:
 
-- `AudioService.scrollStep = 0.02` (2% per wheel step)
+- `AudioService.scrollStep` — user-tunable via Config `audio.scrollStep` (default 0.02, i.e. 2% per wheel step). Service-owned so all consumers share one ratio; Config-tunable because it is a preference (Phase 2 spec §2.8), never hardcoded in widgets
 - Widgets normalize raw wheel input by `angleDelta.y / 120` before calling `adjustVolume(delta)`
 - Any future scrollable widget must declare its step size on its service, never hardcode it in the widget
 

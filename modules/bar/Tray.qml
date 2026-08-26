@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import "../../config" as Config
 import "../../services" as Services
 
 /**
@@ -41,22 +42,26 @@ Item {
 
                 required property var modelData
 
+                // Forced uniform size from Config (spec 2.8): external
+                // apps ship inconsistent native icon sizes.
+                readonly property int _iconSize: Config.Config.trayIconSize
+
                 readonly property string _label:
                     modelData.tooltipTitle || modelData.title || modelData.id
 
-                width: 18
-                height: 18
+                width: _iconSize
+                height: _iconSize
 
-                // Tray icon — fixed size per spec 2.6.5. item.icon is a
-                // ready-to-use image:// URL on this Quickshell build.
+                // Tray icon — item.icon is a ready-to-use image:// URL
+                // on this Quickshell build.
                 Image {
                     id: icon
                     anchors.centerIn: parent
                     source: modelData.icon ?? ""
-                    sourceSize.width: 18
-                    sourceSize.height: 18
-                    width: 18
-                    height: 18
+                    sourceSize.width: trayItem._iconSize
+                    sourceSize.height: trayItem._iconSize
+                    width: trayItem._iconSize
+                    height: trayItem._iconSize
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
                     // Icon themes vary; don't render a broken-image box

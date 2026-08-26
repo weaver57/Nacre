@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
+import "../config" as Config
 
 /**
  * AudioService — reactive audio state from PipeWire.
@@ -49,9 +50,12 @@ QtObject {
         : false
 
     // ── Scroll step size ─────────────────────────────────────────
-    // One scroll step = 2% volume change (0.02). Documented in
-    // CONVENTIONS.md so all future scrollable widgets use the same ratio.
-    readonly property real scrollStep: 0.02
+    // One scroll step = user-tunable delta (Config audio.scrollStep,
+    // Phase 2 spec §2.8 — default 0.02 = 2%). Service-owned so every
+    // scrollable consumer gets the same ratio; tunable because it's a
+    // preference. Documented in CONVENTIONS.md.
+    readonly property real scrollStep: Config.Config.audioScrollStep > 0
+        ? Math.min(1.0, Config.Config.audioScrollStep) : 0.02
 
     // ── wpctl runner ─────────────────────────────────────────────
     // All write actions go through wpctl for reliability.

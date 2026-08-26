@@ -7,6 +7,15 @@
     "clock": {
         "format": "HH:mm"
     },
+    "battery": {
+        "lowThreshold": 20
+    },
+    "audio": {
+        "scrollStep": 0.02
+    },
+    "tray": {
+        "iconSize": 18
+    },
     "theme": "default",
     "modules": {
         "bar": {

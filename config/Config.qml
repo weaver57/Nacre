@@ -44,6 +44,22 @@ QtObject {
     // ── Clock preferences ────────────────────────────────────────
     readonly property string clockFormat: _raw.clock?.format ?? "HH:mm"
 
+    // ── Battery preferences (Phase 2 §2.8) ───────────────────────
+    // Percentage at or below which the Battery widget switches to its
+    // "low" visual state. A preference, not a runtime truth — lives in
+    // Config per the 1.2.1 test, never GlobalStates.
+    readonly property int batteryLowThreshold: _raw.battery?.lowThreshold ?? 20
+
+    // ── Audio preferences (Phase 2 §2.8) ─────────────────────────
+    // Scroll-to-adjust delta (0.0–1.0). Consumed by AudioService.scrollStep
+    // so the step stays service-owned but user-tunable.
+    readonly property real audioScrollStep: _raw.audio?.scrollStep ?? 0.02
+
+    // ── Tray preferences (Phase 2 §2.8) ──────────────────────────
+    // Tray icons come from arbitrary external apps with inconsistent
+    // native sizes; forcing one size keeps the tray visually even.
+    readonly property int trayIconSize: _raw.tray?.iconSize ?? 18
+
     // ── Theme ─────────────────────────────────────────────────────
     readonly property string theme: _raw.theme ?? "default"
 
