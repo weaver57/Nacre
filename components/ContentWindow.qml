@@ -31,13 +31,14 @@ PanelWindow {
     // ── Height from Config ────────────────────────────────────────
     implicitHeight: Config.Config.barHeight ?? 32
 
-    // ── Anchor to top edge ────────────────────────────────────────
-    // Phase 0: hardcoded to top. Phase 2+ will read from Config.barPosition
-    // once the multi-position layout system is built.
+    // ── Anchor to configured edge ─────────────────────────────────
+    // bar.position from Config decides top vs bottom — the same key
+    // BarContent reads, so position changes are consistent everywhere.
     anchors {
-        top: true
         left: true
         right: true
+        top: Config.Config.isBarAtTop
+        bottom: Config.Config.isBarAtBottom
     }
 
     // ── Background ────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import Quickshell
 import Quickshell.Io
 
 /**
@@ -15,8 +16,14 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    // ── Config path ───────────────────────────────────────────────
-    readonly property string configDir:  "/home/weaver/.config/nacre"
+    // ── Config path (XDG — never hardcoded) ──────────────────────
+    // Resolved from the environment so the shell works from any account
+    // or machine. $XDG_CONFIG_HOME wins when set, else $HOME/.config.
+    readonly property string configDir: {
+        const xdg = Quickshell.env("XDG_CONFIG_HOME")
+        const base = (xdg && xdg.length > 0) ? xdg : Quickshell.env("HOME") + "/.config"
+        return base + "/nacre"
+    }
     readonly property string configPath: configDir + "/shell.json"
 
     // ── File reader ───────────────────────────────────────────────

@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import "../services" as Services
 
@@ -16,8 +17,14 @@ import "../services" as Services
 QtObject {
     id: root
 
-    // ── State path (XDG: state, not config) ──────────────────────
-    readonly property string stateDir:  "/home/weaver/.local/state/nacre"
+    // ── State path (XDG: state, not config — never hardcoded) ────
+    // Resolved from the environment so the shell works from any account
+    // or machine. $XDG_STATE_HOME wins when set, else $HOME/.local/state.
+    readonly property string stateDir: {
+        const xdg = Quickshell.env("XDG_STATE_HOME")
+        const base = (xdg && xdg.length > 0) ? xdg : Quickshell.env("HOME") + "/.local/state"
+        return base + "/nacre"
+    }
     readonly property string statePath: stateDir + "/state.json"
 
     // ── File reader ───────────────────────────────────────────────
