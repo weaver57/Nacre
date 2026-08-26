@@ -356,6 +356,54 @@ check "Keybind docs in DEPENDENCIES.md" "grep -q 'volumeIncrease' DEPENDENCIES.m
 check "IPC methods documented in CONVENTIONS.md" "grep -q 'volumeIncrease' CONVENTIONS.md"
 
 # ══════════════════════════════════════════════════════════════════
+# 17. SMOKE TESTS (spec 2.11.1)
+# ══════════════════════════════════════════════════════════════════
+header "17. Smoke Tests"
+
+# Available flag correctness — each service's available is derived,
+# not hardcoded, and matches the spec's contract.
+check "BatteryService.available derives from _batteries"  "grep -q 'readonly property bool available: _batteries.length > 0' services/BatteryService.qml"
+check "AudioService.available checks Pipewire + sink"    "grep -q 'Pipewire.ready' services/AudioService.qml && grep -q 'defaultAudioSink' services/AudioService.qml"
+check "NetworkService.available checks NM reachability"  "grep -q 'Networking.connectivity' services/NetworkService.qml"
+check "TrayService.available derives from items.length"  "grep -q 'readonly property bool available: items.length > 0' services/TrayService.qml"
+
+# Available flag in widgets — collapse is verified in sections 4/6/9/13.
+# Here we verify the guard uses the service's available, not a local copy.
+check "Battery widget guards on service.available"       "grep -q 'visible: Services.BatteryService.available' modules/bar/Battery.qml"
+check "Volume widget guards on service.available"        "grep -q 'visible: Services.AudioService.available' modules/bar/Volume.qml"
+check "Network widget guards on service.available"       "grep -q 'visible: Services.NetworkService.available' modules/bar/Network.qml"
+check "Tray widget guards on service.available"          "grep -q 'visible: Services.TrayService.available' modules/bar/Tray.qml"
+
+# IPC measurability — volume methods exist and use the service (not direct wpctl).
+check "volumeIncrease routes through AudioService"       "grep -A5 'function volumeIncrease' services/IpcHandler.qml | grep -q 'AudioService'"
+check "volumeDecrease routes through AudioService"       "grep -A5 'function volumeDecrease' services/IpcHandler.qml | grep -q 'AudioService'"
+check "volumeToggleMute routes through AudioService"     "grep -A5 'function volumeToggleMute' services/IpcHandler.qml | grep -q 'AudioService'"
+
+# Tray renders real icons — if running, TrayService.items should populate.
+SHELL_PID=$(pgrep -x quickshell 2>/dev/null || true)
+if [[ -n "$SHELL_PID" ]]; then
+    TRAY_LOG=$(timeout 8 quickshell -p . 2>&1 | grep 'tray items:' | tail -1 || true)
+    TRAY_COUNT=$(echo "$TRAY_LOG" | grep -oE '[0-9]+$' || echo "0")
+    info "Tray populated to $TRAY_COUNT items during live run"
+else
+    info "Shell not running — tray icon count check skipped"
+fi
+
+# §2.12 Definition of Done — structural checks
+header "18. Definition of Done - spec 2.12"
+
+check "All four services exist"          "test -f services/BatteryService.qml && test -f services/AudioService.qml && test -f services/NetworkService.qml && test -f services/TrayService.qml"
+check "All four widgets exist"           "test -f modules/bar/Battery.qml && test -f modules/bar/Volume.qml && test -f modules/bar/Network.qml && test -f modules/bar/Tray.qml"
+check "Strategy A implemented (no subprocess)" "! grep -q 'Process {' services/NetworkService.qml && ! grep -q 'Timer {' services/NetworkService.qml"
+check "Strategy A documented"            "grep -q 'Strategy A' CONVENTIONS.md && grep -q 'Strategy A' services/NetworkService.qml"
+check "Volume scroll + click"            "grep -q 'WheelHandler' modules/bar/Volume.qml && grep -q 'toggleMute' modules/bar/Volume.qml"
+check "Tray left-click activate"         "grep -q 'Services.TrayService.activate' modules/bar/Tray.qml"
+check "IPC volume methods exist"         "grep -q 'function volumeIncrease' services/IpcHandler.qml && grep -q 'function volumeDecrease' services/IpcHandler.qml && grep -q 'function volumeToggleMute' services/IpcHandler.qml"
+check "Config has all §2.8 properties"   "grep -q 'batteryLowThreshold' config/Config.qml && grep -q 'audioScrollStep' config/Config.qml && grep -q 'trayIconSize' config/Config.qml"
+check "Global-widget decision documented" "grep -q 'Global vs per-monitor' CONVENTIONS.md"
+check "Commits are discrete (8+ commits on branch)" "test $(git log --oneline phase2-core-status-services | wc -l) -ge 8"
+
+# ══════════════════════════════════════════════════════════════════
 # SUMMARY
 # ══════════════════════════════════════════════════════════════════
 echo ""
