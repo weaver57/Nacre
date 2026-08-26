@@ -290,6 +290,16 @@ Rectangle {
 - **No local state.** Widgets are pure reflections of their data source. If a widget needs to remember something, it goes in GlobalStates or Persistent.
 - **No raw JSON access.** All data flows through Config, GlobalStates, Persistent, or services.
 
+### Global vs per-monitor widgets (spec 2.10)
+
+Some widgets are naturally per-monitor (Workspaces — each Variants-spawned bar instance shows that monitor's workspaces). Others represent global system state — one battery, one default audio sink, one tray, one network connection, regardless of how many monitors exist.
+
+**Decision:** render global widgets identically on every monitor's bar. Each ContentWindow instance shows the full status cluster (battery, volume, network, tray), all bound to the same singleton services — cheap (no duplicated state, just duplicated rendering), and every monitor's bar is a complete, self-sufficient status view.
+
+**Why not primary-monitor-only?** That requires defining what "primary" means, special-casing ContentWindow, and choosing an empty bar vs. a missing-widget bar on secondary monitors — unnecessary complexity for marginal benefit.
+
+**How to tell:** global widgets have no `screen` property and import only services/Config. Per-monitor widgets accept `required property var screen` and filter by it.
+
 ---
 
 ## Bar Layout
