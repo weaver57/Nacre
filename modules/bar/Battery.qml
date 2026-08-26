@@ -29,7 +29,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 4
 
-        // Battery icon text (chargning indicator)
+        // Battery icon text (charging indicator)
         Text {
             text: Services.BatteryService.charging ? "⚡" : "🔋"
             color: "#cdd6f4"

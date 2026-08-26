@@ -11,8 +11,17 @@ import Quickshell.Services.Pipewire
  * Exposes default sink volume and mute state. Actions use wpctl for
  * reliability (PipeWire QML property writes can be flaky — see issue #54).
  *
- * Reading: Pipewire.defaultAudioSink.audio (requires PwObjectTracker in shell.qml).
- * Writing: wpctl via Process (reliable, covers all edge cases).
+ * Reading: `volume`/`muted` are PURE BINDINGS to Pipewire — never assigned
+ * anywhere in this file. Assigning them would destroy the binding (QML
+ * semantics), after which external changes (media keys, pavucontrol)
+ * stop reaching the widget. wpctl writes need no manual sync either:
+ * PipeWire emits change notifications, the bindings re-evaluate, done.
+ * (An earlier _syncFromPipewire/onVolumeChanged scheme did exactly this
+ * wrong — removed. See Phase 2 audit.)
+ *
+ * Writing: single wpctl Process with a one-deep pending queue — commands
+ * issued while a previous wpctl is still running are replayed on exit
+ * instead of silently dropped during fast scrolling.
  *
  * Sink-switching is deferred — this service reflects the current default
  * sink only. See Phase 2 spec section 2.4.2.
@@ -27,26 +36,51 @@ QtObject {
         && Pipewire.defaultAudioSink.audio !== null
 
     // ── Volume (0.0–1.0, normalized) ─────────────────────────────
-    // Raw Pipewire volume is already 0.0–1.0. Widget never does math.
-    property real volume: available
+    // Pure binding — NEVER assign this property; it would break the
+    // reactive chain to Pipewire. Widget never does math.
+    readonly property real volume: available
         ? Pipewire.defaultAudioSink.audio.volume
         : 0.0
 
     // ── Muted state ──────────────────────────────────────────────
-    property bool muted: available
+    // Pure binding — same rule as volume.
+    readonly property bool muted: available
         ? Pipewire.defaultAudioSink.audio.muted
         : false
 
     // ── Scroll step size ─────────────────────────────────────────
-    // One scroll step = 5% volume change. Documented in CONVENTIONS.md
-    // so all future scrollable widgets use the same ratio.
+    // One scroll step = 2% volume change (0.02). Documented in
+    // CONVENTIONS.md so all future scrollable widgets use the same ratio.
     readonly property real scrollStep: 0.02
 
-    // ── wpctl wrapper ────────────────────────────────────────────
+    // ── wpctl runner ─────────────────────────────────────────────
     // All write actions go through wpctl for reliability.
-    // QML property writes to Pipewire can silently fail.
     property var _process: Process {
+        id: proc
         command: ["wpctl"]
+
+        onExited: {
+            // Drain the queue — a command that arrived while we were
+            // busy gets replayed now instead of being dropped.
+            if (root._pendingCommand !== null) {
+                proc.command = root._pendingCommand
+                root._pendingCommand = null
+                proc.running = true
+            }
+        }
+    }
+
+    // Command waiting for the process to free up (one-deep is enough:
+    // each drain runs to completion before the next replay).
+    property var _pendingCommand: null
+
+    function _run(args) {
+        if (proc.running) {
+            _pendingCommand = args   // latest request wins
+        } else {
+            proc.command = args
+            proc.running = true
+        }
     }
 
     // ── Actions ──────────────────────────────────────────────────
@@ -56,10 +90,8 @@ QtObject {
      * Clamped to valid range before dispatch.
      */
     function setVolume(value) {
-        var clamped = Math.max(0.0, Math.min(1.0, value))
-        _process.command = ["wpctl", "set-volume", "@DEFAULT_SINK@",
-                            clamped.toFixed(2)]
-        _process.running = true
+        const clamped = Math.max(0.0, Math.min(1.0, value))
+        _run(["wpctl", "set-volume", "@DEFAULT_SINK@", clamped.toFixed(2)])
     }
 
     /**
@@ -68,47 +100,24 @@ QtObject {
      * One scroll step = scrollStep (2% = 0.02).
      */
     function adjustVolume(delta) {
-        var newVol = Math.max(0.0, Math.min(1.0, volume + delta))
-        setVolume(newVol)
+        setVolume(volume + delta)
     }
 
     /**
      * Toggle mute on the default sink.
      */
     function toggleMute() {
-        _process.command = ["wpctl", "set-mute", "@DEFAULT_SINK@", "toggle"]
-        _process.running = true
         console.log("[AudioService] toggle mute")
+        _run(["wpctl", "set-mute", "@DEFAULT_SINK@", "toggle"])
     }
 
-    // ── Sync state from Pipewire ─────────────────────────────────
-    // wpctl writes are async — re-read from Pipewire after a short
-    // delay to keep QML properties in sync.
-    property var _syncTimer: Timer {
-        interval: 200
-        repeat: false
-        onTriggered: root._syncFromPipewire()
-    }
-
-    function _syncFromPipewire() {
-        if (!available) return
-        volume = Pipewire.defaultAudioSink.audio.volume
-        muted = Pipewire.defaultAudioSink.audio.muted
-    }
-
-    // ── Watch for external volume changes (e.g. hardware keys) ──
-    // Re-sync when Pipewire reports a different volume than we have.
-    // This covers volume changes from outside Nacre (pavucontrol, media keys).
-    onVolumeChanged: {
-        if (available && Math.abs(Pipewire.defaultAudioSink.audio.volume - volume) > 0.01) {
-            // External change detected — let Pipewire be the source of truth
-            volume = Pipewire.defaultAudioSink.audio.volume
-        }
-    }
+    // ── State transition logging ─────────────────────────────────
+    onMutedChanged: console.log("[AudioService] muted:", muted)
+    onAvailableChanged: console.log("[AudioService] available:", available,
+                                     "volume:", Math.round(volume * 100) + "%")
 
     Component.onCompleted: {
-        console.log("[AudioService] available:", available,
-                     "volume:", volume.toFixed(2),
-                     "muted:", muted)
+        console.log("[AudioService] ready — volume:",
+                     Math.round(volume * 100) + "%", "muted:", muted)
     }
 }
