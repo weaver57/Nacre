@@ -19,6 +19,9 @@ import "../services" as Services
  *   barShow / barHide → explicit bar control
  *   workspaceSwitch N → switch to workspace N
  *   shellStatus       → JSON with shell state
+ *   volumeIncrease    → AudioService.adjustVolume(+step) (spec 2.9.1)
+ *   volumeDecrease    → AudioService.adjustVolume(-step) (spec 2.9.1)
+ *   volumeToggleMute  → AudioService.toggleMute()       (spec 2.9.1)
  *
  * All argument and return types must be explicitly typed.
  */
@@ -54,6 +57,29 @@ IpcHandler {
     function workspaceSwitch(id: int): void {
         console.log("[IPC] workspace.switch —", id)
         Services.HyprlandService.switchWorkspace(id)
+    }
+
+    // ── Volume control (spec 2.9.1) ─────────────────────────
+    // Routed through IPC so Hyprland media key bindings become
+    // a two-line config addition (spec 2.9.2), not new shell-side
+    // plumbing. Uses AudioService.adjustVolume with the user-tunable
+    // scrollStep from Config, so the delta matches scroll behavior.
+
+    function volumeIncrease(): void {
+        var step = Services.AudioService.scrollStep
+        console.log("[IPC] volume.increase — step:", step)
+        Services.AudioService.adjustVolume(step)
+    }
+
+    function volumeDecrease(): void {
+        var step = Services.AudioService.scrollStep
+        console.log("[IPC] volume.decrease — step:", step)
+        Services.AudioService.adjustVolume(-step)
+    }
+
+    function volumeToggleMute(): void {
+        console.log("[IPC] volume.toggleMute")
+        Services.AudioService.toggleMute()
     }
 
     // ── Shell status ─────────────────────────────────────────────

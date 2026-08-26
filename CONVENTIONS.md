@@ -378,6 +378,24 @@ Keybind → GlobalShortcut → GlobalStates → Module visibility
 
 **Never:** `Keybind → Hyprland dispatcher → module reacts`
 
+### IPC Methods (current)
+
+All methods live in `services/IpcHandler.qml`. Hyprland keybinds call them via `qs ipc call nacre <method>`.
+
+| Method | Return | What it does |
+|--------|--------|-------------|
+| `ping` | `string` | Health check → "pong from nacre" |
+| `barToggle` | `void` | Toggle bar visibility |
+| `barShow` | `void` | Force bar visible |
+| `barHide` | `void` | Force bar hidden |
+| `workspaceSwitch(id: int)` | `void` | Switch to workspace N |
+| `shellStatus` | `string` | JSON with shell state |
+| `volumeIncrease` | `void` | AudioService.adjustVolume(+step) (spec 2.9.1) |
+| `volumeDecrease` | `void` | AudioService.adjustVolume(-step) (spec 2.9.1) |
+| `volumeToggleMute` | `void` | AudioService.toggleMute() (spec 2.9.1) |
+
+Every IPC method must have a real caller (spec 2.9.3). Volume methods are called by Hyprland media keybinds (XF86AudioRaiseVolume/LowerVolume/Mute). Battery, network, and tray are read-only in Phase 2 — no IPC methods for them until a real use case exists.
+
 ---
 
 ## Relative Imports
