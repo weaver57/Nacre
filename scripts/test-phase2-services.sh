@@ -275,9 +275,38 @@ check "Registered in modules/bar/qmldir"          "grep -q 'Tray 1.0 Tray.qml' m
 check "Chained into BarContent"                   "grep -q 'Tray {' modules/bar/BarContent.qml"
 check "Repeater bound to service items"           "grep -q 'Repeater' modules/bar/Tray.qml && grep -q 'model: Services.TrayService.items' modules/bar/Tray.qml"
 check "Click routes through service activate"     "grep -q 'Services.TrayService.activate' modules/bar/Tray.qml"
-check "Fixed icon size (spec 2.6.5)"              "grep -qE 'width: 18|sourceSize.width' modules/bar/Tray.qml"
+check "Config-driven icon size (spec 2.8)"        "grep -q '_iconSize' modules/bar/Tray.qml && grep -q 'Config.trayIconSize' modules/bar/Tray.qml"
 check "Left-click-only documented in code"        "grep -qiE 'left-click only|out of scope for phase 2' modules/bar/Tray.qml"
 check "Limitation noted in CONVENTIONS.md"        "grep -q 'Left-click activate only' CONVENTIONS.md"
+
+# ════════════════════════════════════════════════════════════
+# 14. CONFIG ADDITIONS (spec 2.8)
+# ════════════════════════════════════════════════════════════
+header "14. Config Preferences"
+
+check "batteryLowThreshold property"        "grep -q 'batteryLowThreshold' config/Config.qml"
+check "audioScrollStep property"             "grep -q 'audioScrollStep' config/Config.qml"
+check "trayIconSize property"                "grep -q 'trayIconSize' config/Config.qml"
+check "Defaults in shell.default.json"       "grep -q 'lowThreshold' shell.default.json && grep -q 'scrollStep' shell.default.json && grep -q 'iconSize' shell.default.json"
+check "AudioService reads Config scrollStep" "grep -qE 'Config\.Config\.audioScrollStep' services/AudioService.qml"
+check "Tray reads Config iconSize"           "grep -q 'Config.trayIconSize' modules/bar/Tray.qml"
+check "No preferences in GlobalStates"       "! grep -qE 'lowThreshold|scrollStep|iconSize' state/GlobalStates.qml"
+
+# ════════════════════════════════════════════════════════════
+# 15. CONSUMER WIDGETS (spec 2.7)
+# ════════════════════════════════════════════════════════════
+header "15. Consumer Widgets"
+
+check "Battery imports Config"                          "grep -q 'config' modules/bar/Battery.qml"
+check "Battery low-threshold color when discharging"    "grep -qE '_isLow|lowThreshold' modules/bar/Battery.qml && grep -qE 'discharging' modules/bar/Battery.qml"
+check "Battery hides when unavailable (collapse)"       "grep -q 'visible: Services.BatteryService.available' modules/bar/Battery.qml"
+check "Network icon reflects connectionType"            "grep -q 'connectionType' modules/bar/Network.qml"
+check "Network signal strength bars (wifi)"            "grep -q 'signalStrength' modules/bar/Network.qml"
+check "Network hides when unavailable (collapse)"       "grep -q 'visible: Services.NetworkService.available' modules/bar/Network.qml"
+check "Volume mute icon reflected"                      "grep -q 'muted' modules/bar/Volume.qml"
+check "Volume scroll → AudioService"                    "grep -q 'AudioService.adjustVolume' modules/bar/Volume.qml || grep -q 'scrollStep' modules/bar/Volume.qml"
+check "Volume click → toggleMute"                       "grep -q 'toggleMute' modules/bar/Volume.qml"
+check "Battery/Network/Volume have no click actions"    "! grep -qE 'MouseArea|onClick' modules/bar/Battery.qml && ! grep -qE 'MouseArea|onClick' modules/bar/Network.qml"
 
 # SUMMARY
 # ══════════════════════════════════════════════════════════════════

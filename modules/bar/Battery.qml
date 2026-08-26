@@ -1,25 +1,32 @@
 import QtQuick
+import "../../config" as Config
 import "../../services" as Services
 
 /**
- * Battery — global battery indicator for the bar.
+ * Battery — global battery indicator for the bar (Phase 2 §2.7.1).
  *
- * Shows battery percentage and a charging indicator.
- * Global widget (not per-monitor) — battery state is the same
- * on every screen. Only visible when BatteryService.available is true
- * (i.e., machine has a laptop battery — hidden on desktops).
+ * Shows a charge-state icon + percentage text. The icon reflects three
+ * visual states:
+ *   - Charging: ⚡ (regardless of percentage)
+ *   - Full:     🔋 with standard color
+ *   - Low:      🔋 with a warning color — when percentage ≤
+ *               Config.batteryLowThreshold while discharging
+ *   - Normal:   🔋 with standard color
  *
- * This is the first "global widget" in Nacre — unlike Workspaces
- * (per-monitor), battery/audio/tray/network are not screen-specific.
- * See CONVENTIONS.md for the distinction.
+ * Global widget (not per-monitor). Collapses entirely when
+ * BatteryService.available is false (desktops with no battery).
+ * No click/interaction — that is a Phase 3+ concern (power menu).
  *
  * Colors are hardcoded (Phase 2 acceptable debt, themed in Phase 4).
  */
 Item {
     id: root
 
-    // Only visible on machines with a battery
     visible: Services.BatteryService.available
+
+    readonly property bool _isLow:
+        Services.BatteryService.percentage <= Config.Config.batteryLowThreshold
+        && Services.BatteryService.state === "discharging"
 
     implicitWidth: batteryRow.implicitWidth
     implicitHeight: batteryRow.implicitHeight
@@ -29,18 +36,22 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 4
 
-        // Battery icon text (charging indicator)
+        // Charge-state icon — three visual states
         Text {
-            text: Services.BatteryService.charging ? "⚡" : "🔋"
-            color: "#cdd6f4"
+            text: {
+                if (Services.BatteryService.charging) return "⚡"
+                if (Services.BatteryService.state === "full") return "🔋"
+                return "🔋"
+            }
+            color: root._isLow ? "#f38ba8" : "#cdd6f4"
             font.pixelSize: 13
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        // Percentage text
+        // Percentage text — warning color when low
         Text {
             text: Services.BatteryService.percentage + "%"
-            color: "#cdd6f4"
+            color: root._isLow ? "#f38ba8" : "#cdd6f4"
             font.pixelSize: 13
             font.family: "monospace"
             anchors.verticalCenter: parent.verticalCenter
@@ -49,6 +60,7 @@ Item {
 
     Component.onCompleted: {
         console.log("[Battery] widget created — available:",
-                     Services.BatteryService.available)
+                     Services.BatteryService.available,
+                     "lowThreshold:", Config.Config.batteryLowThreshold)
     }
 }
